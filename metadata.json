@@ -1,0 +1,9 @@
+{
+  "name": "AeroProfissional",
+  "description": "AI-powered recruitment landing page with video recording, document upload, and automated profile screening.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

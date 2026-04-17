@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #050507;
+  --color-brand-accent: #00f2ff;
+  --color-brand-accent-glow: rgba(0, 242, 255, 0.3);
+  --color-brand-text: #f0f0f5;
+  --color-brand-dim: #9494a5;
+  --color-brand-border: rgba(255, 255, 255, 0.08);
+  --color-brand-card: rgba(20, 20, 25, 0.6);
+  --color-brand-glass: rgba(255, 255, 255, 0.03);
+}
+
+body {
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+}

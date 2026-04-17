@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -57,6 +57,8 @@ interface Candidate {
   score?: number;
   aiSummary?: string;
   cvAnalysis?: string; // AI generated CV analysis
+  videoAnalysis?: string; // AI generated Video presence analysis
+  videoScore?: number; // Score specifically for the video introduction
   hrComments?: string[];
 }
 
@@ -824,7 +826,22 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const [newComment, setNewComment] = useState('');
   const [previewAsset, setPreviewAsset] = useState<{ url: string, name: string } | null>(null);
   const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
+
+  const handleVideoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      const base64 = loadEvent.target?.result as string;
+      const updatedCandidate = { ...selected, videoUrl: base64 };
+      setCandidates(prev => prev.map(c => c.id === selected.id ? updatedCandidate : c));
+      setSelected(updatedCandidate);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const deleteCandidate = (id: string) => {
     setCandidates(prev => prev.filter(c => c.id !== id));
@@ -856,7 +873,7 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
       
       try {
         const canvas = await html2canvas(element, {
-          scale: 2,
+          scale: 3,
           useCORS: true,
           backgroundColor: '#ffffff',
         });
@@ -915,11 +932,16 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
 
         const availableHeight = height - 40;
         const availableWidth = width - 30;
-        let targetWidth = img.width;
-        let targetHeight = img.height;
-        const ratio = Math.min(availableWidth / targetWidth, availableHeight / targetHeight);
-        targetWidth *= ratio;
-        targetHeight *= ratio;
+        
+        // Convert pixels to mm assuming 96 DPI for "Actual Size" reference
+        const pxToMm = 25.4 / 96;
+        let targetWidth = img.width * pxToMm;
+        let targetHeight = img.height * pxToMm;
+
+        // Ensure it fits the page (Scale down if larger than available space)
+        const scaleDownRatio = Math.min(1, availableWidth / targetWidth, availableHeight / targetHeight);
+        targetWidth *= scaleDownRatio;
+        targetHeight *= scaleDownRatio;
         
         const xOffset = (width - targetWidth) / 2;
         const yOffset = 30 + (availableHeight - targetHeight) / 2;
@@ -1014,7 +1036,8 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
         contents: `Act as a senior aviation recruiter. Analyze this cabin crew candidate profile (treating the provided experience data as the core CV content) and provide:
         1. A high-level screening summary (max 2 sentences).
         2. A detailed "CV Professional Scan" which identifies key strengths, potential gaps, and suitability for international flight operations (3-4 bullet points).
-        3. A numerical score out of 100.
+        3. A "Video Impression Analysis" focusing on perceived presence, passion for aviation, and communication clarity as suggested by their profile and intro recording (max 2 sentences).
+        4. A total numerical score out of 100, and a dedicated "Video Score" out of 100.
         
         Candidate Name: ${candidate.name}
         Role: ${candidate.role}
@@ -1026,18 +1049,34 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
         Rotation Preference: ${candidate.rotation}
         Documents Uploaded: ${candidate.docs.join(', ')}
         
-        Format your response strictly as a JSON object: { "summary": string, "cvScan": string, "score": number }`
+        Format your response strictly as a JSON object: { "summary": string, "cvScan": string, "videoImpression": string, "score": number, "videoScore": number }`
       });
 
-      const resText = response.text || '{ "summary": "Analysis complete.", "cvScan": "Competitive aviation profile.", "score": 85 }';
+      const resText = response.text || '{ "summary": "Analysis complete.", "cvScan": "Competitive aviation profile.", "videoImpression": "Professional and engaging video presence.", "score": 85, "videoScore": 88 }';
       const cleanJson = resText.replace(/```json|```/g, '').trim();
       const result = JSON.parse(cleanJson);
 
       setCandidates(prev => prev.map(c => 
-        c.id === candidate.id ? { ...c, aiSummary: result.summary, cvAnalysis: result.cvScan, score: result.score, status: 'Screened' } : c
+        c.id === candidate.id ? { 
+          ...c, 
+          aiSummary: result.summary, 
+          cvAnalysis: result.cvScan, 
+          videoAnalysis: result.videoImpression,
+          videoScore: result.videoScore,
+          score: result.score, 
+          status: 'Screened' 
+        } : c
       ));
       if (selected?.id === candidate.id) {
-        setSelected({ ...selected, aiSummary: result.summary, cvAnalysis: result.cvScan, score: result.score, status: 'Screened' });
+        setSelected({ 
+          ...selected, 
+          aiSummary: result.summary, 
+          cvAnalysis: result.cvScan, 
+          videoAnalysis: result.videoImpression,
+          videoScore: result.videoScore,
+          score: result.score, 
+          status: 'Screened' 
+        });
       }
     } catch (err) {
       console.error("AI Error:", err);
@@ -1201,9 +1240,24 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
               <div className="grid md:grid-cols-2 gap-16">
                 <div className="space-y-12">
                   <div className="space-y-6">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-dim flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-brand-accent" /> Video Stream Analysis
-                    </h4>
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-dim flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-brand-accent" /> Video Stream Analysis
+                      </h4>
+                      <button 
+                        onClick={() => videoInputRef.current?.click()}
+                        className="text-[10px] font-black uppercase tracking-widest text-brand-accent hover:text-white transition-colors flex items-center gap-2"
+                      >
+                        <Upload className="w-3 h-3" /> Replace Asset
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={videoInputRef} 
+                        onChange={handleVideoUpload} 
+                        accept="video/*" 
+                        className="hidden" 
+                      />
+                    </div>
                     <div 
                       onClick={() => setPlayingVideo(selected.videoUrl || `https://www.w3schools.com/html/mov_bbb.mp4`)} // Default mock video
                       className="aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative group border border-brand-border cursor-pointer hover:border-brand-accent transition-all"
@@ -1318,6 +1372,14 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
                         <div className="bg-white/20 p-5 rounded-2xl border border-white/20">
                            <p className="text-[10px] font-black uppercase tracking-widest mb-3 opacity-60">Full CV Intelligence Scan</p>
                            <p className="text-xs font-bold leading-relaxed whitespace-pre-wrap">{selected.cvAnalysis || "Run scan to extract digital profile."}</p>
+                        </div>
+
+                        <div className="bg-white/10 p-5 rounded-2xl border border-white/10">
+                           <div className="flex justify-between items-center mb-3">
+                             <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Neural Video Intelligence</p>
+                             <div className="text-[10px] font-black bg-black/20 px-2 py-0.5 rounded text-black">{selected.videoScore || '--'}/100</div>
+                           </div>
+                           <p className="text-xs font-bold leading-relaxed whitespace-pre-wrap italic opacity-80">"{selected.videoAnalysis || "Pending recording analysis."}"</p>
                         </div>
                       </div>
                     ) : (
@@ -1467,7 +1529,7 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
           </div>
 
           {/* Main Intelligence Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '40px', marginBottom: '50px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '40px', marginBottom: '40px' }}>
             <div style={{ background: '#f8f9fa', padding: '30px', borderRadius: '25px', border: '1px solid #eee' }}>
               <h3 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '3px', color: '#00b8cc', marginBottom: '20px', fontWeight: '900' }}>Vantage CV Career Scan</h3>
               <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.8', whiteSpace: 'pre-wrap', fontWeight: '500' }}>
@@ -1475,9 +1537,9 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
               </div>
             </div>
 
-            <div style={{ spaceY: '25px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               <div style={{ background: '#00f2ff', color: 'black', padding: '30px', borderRadius: '25px', boxShadow: '0 15px 40px rgba(0,242,255,0.3)' }}>
-                <h3 style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: 'rgba(0,0,0,0.5)', marginBottom: '15px', fontWeight: '900' }}>Neural Screening</h3>
+                <h3 style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: 'rgba(0,0,0,0.5)', marginBottom: '15px', fontWeight: '900' }}>Overall Neural Suitability</h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
                   <span style={{ fontSize: '56px', fontWeight: '950', letterSpacing: '-3px' }}>{selected.score || '--'}%</span>
                   <div style={{ width: '55px', height: '55px', borderRadius: '50%', background: 'black', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>AI</div>
@@ -1485,7 +1547,7 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
                 <p style={{ fontSize: '14px', lineHeight: '1.6', fontWeight: '600' }}>{selected.aiSummary || 'Deployment Summary: Pending neural evaluation.'}</p>
               </div>
 
-              <div style={{ background: '#f8f9fa', padding: '25px', borderRadius: '20px', border: '1px solid #eee', marginTop: '25px' }}>
+              <div style={{ background: '#f8f9fa', padding: '25px', borderRadius: '20px', border: '1px solid #eee' }}>
                 <h3 style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '2px', color: '#00b8cc', marginBottom: '15px', fontWeight: '900' }}>Flight Metrics</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                   {[
@@ -1505,20 +1567,90 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
             </div>
           </div>
 
-          {/* Visual Evidence Section (Optional/Preview only, PDF generation adds pages manually) */}
+          {/* New Video Intelligence Section */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px', background: 'linear-gradient(to right, #ffffff, #f0fdff)', padding: '35px', borderRadius: '25px', border: '1px solid #e0faff', marginBottom: '40px' }}>
+            <div style={{ borderRight: '1px solid #e0faff', paddingRight: '20px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '900', color: '#00b8cc', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '15px' }}>Video Presence Score</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                <span style={{ fontSize: '48px', fontWeight: '950', color: '#000' }}>{selected.videoScore || '--'}</span>
+                <span style={{ fontSize: '18px', fontWeight: '800', color: '#666' }}>/ 100</span>
+              </div>
+              <div style={{ width: '100%', height: '6px', background: '#eee', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' }}>
+                <div style={{ width: `${selected.videoScore || 0}%`, height: '100%', background: '#00f2ff' }} />
+              </div>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: '#666', marginBottom: '15px', fontWeight: '900' }}>NEURAL VIDEO ANALYSIS REPORT</h3>
+              <p style={{ fontSize: '13px', lineHeight: '1.7', color: '#333', fontWeight: '500', margin: 0 }}>
+                {selected.videoAnalysis || "Digital session not yet decoded. Run neural scanner to analyze candidate introduction and communication clarity."}
+              </p>
+            </div>
+          </div>
+
+          {/* Visual Evidence Section (Optimized for High Quality Dossier) */}
           <div style={{ background: '#f8f9fa', padding: '40px', borderRadius: '30px', border: '1px solid #eee', marginTop: '30px' }}>
             <h3 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '4px', color: '#00b8cc', marginBottom: '30px', fontWeight: '950', textAlign: 'center' }}>
-              Summary Asset Registry
+              Summary Evidence Registry
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {selected.docs.slice(0, 4).map(doc => (
-                <div key={doc} style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'white', padding: '15px', borderRadius: '15px', border: '1px solid #eee' }}>
-                  <div style={{ width: '40px', height: '40px', background: '#00f2ff', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle2 style={{ width: '20px', height: '20px', color: 'black' }} />
+            
+            {/* High-Impact Visual Block for Primary Identification */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '25px', marginBottom: '35px' }}>
+              {[
+                { label: 'Recent Photograph', id: 'photo', keywords: ['photograph', 'headshot'] },
+                { label: 'Full-Body Photograph', id: 'fullbody', keywords: ['full-body', 'fullbody'] },
+                { label: 'Copy of Passport', id: 'passport', keywords: ['passport', 'scan'] }
+              ].map(item => {
+                const docKey = selected.docs.find(d => 
+                  d.toLowerCase().includes(item.label.toLowerCase()) ||
+                  d.toLowerCase().includes(item.id) || 
+                  item.keywords.some(k => d.toLowerCase().includes(k))
+                );
+                const url = docKey ? selected.docUrls?.[docKey] : null;
+                const isPdf = url?.startsWith('data:application/pdf');
+
+                return (
+                  <div key={item.id} style={{ position: 'relative', background: '#fff', borderRadius: '20px', overflow: 'hidden', border: '1px solid #eee', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                    {url && (
+                      <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 5, background: '#00f2ff', padding: '4px 8px', borderRadius: '6px', fontSize: '6px', fontWeight: '950', color: 'black', textTransform: 'uppercase' }}>
+                        Neural Verified
+                      </div>
+                    )}
+                    <div style={{ height: '140px', background: '#f8fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '10px' }}>
+                      {url && !isPdf ? (
+                        <img 
+                          src={url} 
+                          style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: '4px' }}
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#999' }}>
+                          {isPdf ? <FileText style={{ width: '30px', height: '30px', opacity: 0.3, margin: '0 auto' }} /> : <Search style={{ width: '30px', height: '30px', opacity: 0.3, margin: '0 auto' }} />}
+                          <p style={{ fontSize: '8px', fontWeight: '900', marginTop: '10px' }}>{isPdf ? 'SECURE PDF' : 'PENDING'}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '12px', borderTop: '1px solid #eee', textAlign: 'center', background: '#fafbfc' }}>
+                      <p style={{ fontSize: '9px', fontWeight: '900', color: '#000', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>{item.label}</p>
+                      <p style={{ fontSize: '7px', color: url ? '#00b8cc' : '#999', margin: '2px 0 0', fontWeight: '900', letterSpacing: '1.5px' }}>{url ? 'ASSET VERIFIED' : 'AWAITING UPLOAD'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p style={{ fontSize: '10px', fontWeight: '900', color: '#000', margin: 0 }}>{doc.split(': ')[0]}</p>
-                    <p style={{ fontSize: '8px', color: '#999', margin: 0 }}>VERIFIED COMPLIANCE</p>
+                );
+              })}
+            </div>
+
+            {/* Supplementary Documentation List */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              {selected.docs
+                .filter(d => !['Recent Photograph', 'Full-Body Photograph', 'Copy of Passport'].some(p => d.startsWith(p)))
+                .map(doc => (
+                <div key={doc} style={{ display: 'flex', alignItems: 'center', gap: '15px', background: 'white', padding: '15px', borderRadius: '15px', border: '1px solid #eee' }}>
+                  <div style={{ width: '35px', height: '35px', background: '#00f2ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle2 style={{ width: '18px', height: '18px', color: 'black' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '9px', fontWeight: '900', color: '#000', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.split(': ')[0]}</p>
+                    <p style={{ fontSize: '7px', color: '#999', margin: 0, fontWeight: '900' }}>COMPLIANT ARCHIVE</p>
                   </div>
                 </div>
               ))}

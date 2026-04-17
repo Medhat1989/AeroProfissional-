@@ -43,7 +43,8 @@ import {
   deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { db, auth } from './lib/firebase';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from './lib/firebase';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
 // --- Types ---
@@ -2199,6 +2200,7 @@ const AdminDashboard = ({
 export default function App() {
   const [view, setView] = useState<ViewState>('splash');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Real-time Firestore Sync
   useEffect(() => {
@@ -2217,14 +2219,19 @@ export default function App() {
 
   const handleApply = async (newCand: Partial<Candidate>) => {
     try {
-      // Check if video is too large for Firestore document (limit 1MB)
-      if (newCand.videoUrl && newCand.videoUrl.length > 1000000) {
-        alert("The recorded video is too large for the system. Please try a shorter introduction or lower resolution.");
-        return;
+      setIsUploading(true);
+      let finalVideoUrl = newCand.videoUrl;
+
+      // If we have a video (base64 from recorder), upload to Firebase Storage
+      if (newCand.videoUrl && newCand.videoUrl.startsWith('data:video')) {
+        const storageRef = ref(storage, `videos/${Date.now()}_video.webm`);
+        const snapshot = await uploadString(storageRef, newCand.videoUrl, 'data_url');
+        finalVideoUrl = await getDownloadURL(snapshot.ref);
       }
 
       const candidateData = {
         ...newCand,
+        videoUrl: finalVideoUrl,
         status: 'Pending',
         appliedAt: new Intl.DateTimeFormat('en-CA').format(new Date()), // YYYY-MM-DD
         createdAt: serverTimestamp(),
@@ -2236,7 +2243,9 @@ export default function App() {
       setView('success');
     } catch (error) {
       const errInfo = handleFirestoreError(error, OperationType.WRITE, 'candidates');
-      alert(`Application submission failed: ${errInfo.error}. Please ensure your introduction video is short and try again.`);
+      alert(`Application submission failed: ${errInfo.error}. Please try again.`);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -2259,6 +2268,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text selection:bg-brand-accent selection:text-black flex flex-col">
+      {/* Global Loading Overlay */}
+      {isUploading && (
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center">
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-brand-accent border-t-transparent rounded-full mb-8 shadow-[0_0_30px_rgba(0,242,255,0.4)]"
+          />
+          <h2 className="text-xl font-black uppercase tracking-[0.3em] text-white mb-2">Syncing Assets</h2>
+          <p className="text-[10px] uppercase font-black tracking-widest text-brand-dim">Transmitting introduction data to AeroProfissional Index</p>
+        </div>
+      )}
+
       <Header view={view} setView={setView} />
       
       <main className="flex-1">

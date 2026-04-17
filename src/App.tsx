@@ -368,9 +368,19 @@ const VideoRecorder = ({ onComplete }: { onComplete: (base64: string) => void })
 
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const s = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          facingMode: "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }, 
+        audio: true 
+      });
       setStream(s);
-      if (videoRef.current) videoRef.current.srcObject = s;
+      if (videoRef.current) {
+        videoRef.current.srcObject = s;
+        videoRef.current.play().catch(e => console.error("Video play failed", e));
+      }
     } catch (err) {
       console.error("Error accessing camera", err);
     }
@@ -379,25 +389,46 @@ const VideoRecorder = ({ onComplete }: { onComplete: (base64: string) => void })
   const startRecording = () => {
     if (!stream) return;
     chunksRef.current = [];
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
-      
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        const base64 = loadEvent.target?.result as string;
-        onComplete(base64);
+    
+    // Detect best supported MIME type for mobile (especially iOS/Safari)
+    const types = [
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ];
+    let selectedType = '';
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        selectedType = type;
+        break;
+      }
+    }
+
+    const options = selectedType ? { mimeType: selectedType } : {};
+    try {
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      reader.readAsDataURL(blob);
-    };
-    mediaRecorder.start();
-    setRecording(true);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: selectedType || 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+        
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          const base64 = loadEvent.target?.result as string;
+          onComplete(base64);
+        };
+        reader.readAsDataURL(blob);
+      };
+      mediaRecorder.start(1000); // Collect data every second for safety
+      setRecording(true);
+    } catch (err) {
+      console.error("MediaRecorder start failed", err);
+    }
   };
 
   const stopRecording = () => {
@@ -496,7 +527,7 @@ const VideoRecorder = ({ onComplete }: { onComplete: (base64: string) => void })
   );
 };
 
-const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>) => void }) => {
+const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Candidate>) => void, onBack: () => void }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -638,13 +669,21 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 </select>
               </div>
             </div>
-            <button 
-              disabled={!formData.name || !formData.email || !formData.mobile || !formData.role}
-              onClick={handleNext}
-              className="w-full py-5 bg-brand-accent text-black rounded-lg font-black uppercase tracking-widest hover:scale-[1.02] transition-all disabled:opacity-30 shadow-[0_0_30px_var(--color-brand-accent-glow)] flex items-center justify-center gap-3"
-            >
-              Experience Details <ChevronRight className="w-5 h-5" />
-            </button>
+            <div className="flex gap-4">
+              <button 
+                onClick={onBack}
+                className="flex-1 py-5 border border-brand-border text-brand-dim rounded-lg font-black uppercase tracking-widest text-[10px] hover:text-white transition-colors"
+              >
+                Back to Portal
+              </button>
+              <button 
+                disabled={!formData.name || !formData.email || !formData.mobile || !formData.role}
+                onClick={handleNext}
+                className="flex-[2] py-5 bg-brand-accent text-black rounded-lg font-black uppercase tracking-widest hover:scale-[1.02] transition-all disabled:opacity-30 shadow-[0_0_30px_var(--color-brand-accent-glow)] flex items-center justify-center gap-3"
+              >
+                Experience Details <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -1026,6 +1065,14 @@ const SuccessScreen = ({ onReset }: { onReset: () => void }) => (
     >
       Return to Interface
     </button>
+    <div className="mt-12">
+      <button 
+        onClick={onReset}
+        className="text-[10px] font-black uppercase tracking-widest text-brand-dim hover:text-white transition-colors"
+      >
+        Back to Global Hub
+      </button>
+    </div>
   </div>
 );
 
@@ -1033,12 +1080,14 @@ const AdminDashboard = ({
   candidates, 
   setCandidates, 
   onUpdate, 
-  onDelete 
+  onDelete,
+  onBack
 }: { 
   candidates: Candidate[], 
   setCandidates: any,
   onUpdate: (id: string, updates: Partial<Candidate>) => Promise<void>,
-  onDelete: (id: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>,
+  onBack: () => void
 }) => {
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [screening, setScreening] = useState(false);
@@ -1479,6 +1528,12 @@ const AdminDashboard = ({
               </div>
             )}
           </div>
+          <button 
+            onClick={onBack}
+            className="w-full mt-8 py-5 bg-brand-glass border border-brand-border text-brand-dim rounded-2xl font-black uppercase tracking-widest text-[10px] hover:text-brand-accent hover:border-brand-accent/50 transition-all flex items-center justify-center gap-3"
+          >
+            Exit to Gateway Portal
+          </button>
         </div>
 
         {/* Main Panel */}
@@ -2178,7 +2233,7 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <ApplicationWizard onComplete={handleApply} />
+              <ApplicationWizard onComplete={handleApply} onBack={() => setView('landing')} />
             </motion.div>
           )}
 
@@ -2205,6 +2260,7 @@ export default function App() {
                 setCandidates={setCandidates} 
                 onUpdate={updateCandidate}
                 onDelete={deleteCandidate}
+                onBack={() => setView('landing')}
               />
             </motion.div>
           )}

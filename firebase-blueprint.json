@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "Candidate": {
+      "title": "Candidate",
+      "description": "Candidate application dossier for the AeroProfissional platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "role": { "type": "string" },
+        "height": { "type": "string" },
+        "weight": { "type": "string" },
+        "lastFlightDate": { "type": "string" },
+        "lastOperator": { "type": "string" },
+        "nearestAirport": { "type": "string" },
+        "isSenior": { "type": "boolean" },
+        "hasEasa": { "type": "boolean" },
+        "easaRef": { "type": "string" },
+        "hasEasaMedical": { "type": "boolean" },
+        "rotation": { "type": "string" },
+        "docs": { "type": "array", "items": { "type": "string" } },
+        "docUrls": { "type": "object" },
+        "photoUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "appliedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Verified", "Rejected"] },
+        "score": { "type": "number" },
+        "screeningResult": { "type": "string" },
+        "hrComments": { "type": "array", "items": { "type": "string" } },
+        "uid": { "type": "string" }
+      },
+      "required": ["name", "email", "role", "appliedAt", "status"]
+    }
+  },
+  "firestore": {
+    "/candidates/{candidateId}": {
+      "schema": "Candidate",
+      "description": "Public and private candidate documents"
+    }
+  }
+}

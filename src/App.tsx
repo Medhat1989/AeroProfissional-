@@ -32,6 +32,18 @@ import {
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { PDFDocument } from 'pdf-lib';
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc, 
+  deleteDoc,
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db } from './lib/firebase';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
 // --- Types ---
@@ -569,7 +581,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="text" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="Medhat Khalil"
+                  placeholder="Jane Doe"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                 />
@@ -579,7 +591,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="email" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="medhat@aeroprofessional.com"
+                  placeholder="jane.doe@example.com"
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
@@ -589,7 +601,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="tel" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="+44 7700 900000"
+                  placeholder="+44 20 7123 4567"
                   value={formData.mobile}
                   onChange={e => setFormData({ ...formData, mobile: e.target.value })}
                 />
@@ -599,7 +611,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="text" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="180cm"
+                  placeholder="e.g. 175cm"
                   value={formData.height}
                   onChange={e => setFormData({ ...formData, height: e.target.value })}
                 />
@@ -609,7 +621,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="text" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="75kg"
+                  placeholder="e.g. 65kg"
                   value={formData.weight}
                   onChange={e => setFormData({ ...formData, weight: e.target.value })}
                 />
@@ -659,7 +671,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="text" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="Etihad, Emirates, etc."
+                  placeholder="e.g. Global Airways"
                   value={formData.lastOperator}
                   onChange={e => setFormData({ ...formData, lastOperator: e.target.value })}
                 />
@@ -669,7 +681,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                 <input 
                   type="text" 
                   className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                  placeholder="LHR, DXB, JFK"
+                  placeholder="e.g. LHR"
                   value={formData.nearestAirport}
                   onChange={e => setFormData({ ...formData, nearestAirport: e.target.value })}
                 />
@@ -702,7 +714,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                   <input 
                     type="text" 
                     className="w-full p-4 bg-brand-glass border border-brand-border focus:border-brand-accent rounded-xl outline-none transition-all text-white"
-                    placeholder="EASA.XX.XXXXXX"
+                    placeholder="e.g. EASA.CC.123456"
                     value={formData.easaRef}
                     onChange={e => setFormData({ ...formData, easaRef: e.target.value })}
                   />
@@ -834,10 +846,16 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
 
             <div className="flex gap-4">
               <button 
-                onClick={handleSubmit}
+                onClick={() => setStep(3)} 
+                className="flex-1 py-5 border border-brand-border text-brand-dim rounded-lg font-black uppercase tracking-widest hover:text-white transition-colors"
+              >
+                Back
+              </button>
+              <button 
+                onClick={handleNext}
                 className="flex-[2] py-5 bg-brand-accent text-black rounded-lg font-black uppercase tracking-[0.2em] shadow-[0_0_40px_var(--color-brand-accent-glow)] hover:scale-[1.02] transition-all"
               >
-                Submit Application
+                Review Profile
               </button>
             </div>
           </motion.div>
@@ -852,61 +870,136 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
             className="space-y-10"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4 p-6 bg-brand-glass rounded-3xl border border-brand-border">
-                <div className="flex justify-between items-center border-b border-brand-border pb-3 mb-4">
-                  <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-accent">Identity</h4>
-                  <button onClick={() => setStep(1)} className="text-[8px] uppercase font-bold text-brand-dim hover:text-white transition-colors">Edit</button>
+              {/* Photo & Identity */}
+              <div className="md:col-span-2 flex flex-col md:flex-row items-center gap-8 p-8 bg-brand-glass rounded-[2rem] border border-brand-border">
+                <div className="relative">
+                  <img 
+                    src={formData.photoUrl || `https://picsum.photos/seed/${formData.email}/200/200`} 
+                    className="w-32 h-32 rounded-2xl object-cover border-2 border-brand-accent" 
+                    alt="Applicant" 
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-brand-accent rounded-lg flex items-center justify-center border-4 border-brand-bg">
+                    <User className="w-4 h-4 text-black" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] text-brand-dim uppercase">Name: <span className="text-white font-bold ml-2">{formData.name}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Email: <span className="text-white font-bold ml-2">{formData.email}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Mobile: <span className="text-white font-bold ml-2">{formData.mobile}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Physical: <span className="text-white font-bold ml-2">{formData.height}cm / {formData.weight}kg</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Role: <span className="text-white font-bold ml-2">{formData.role}</span></p>
+                <div className="text-center md:text-left space-y-2">
+                   <h3 className="text-3xl font-bold text-white uppercase tracking-tight">{formData.name}</h3>
+                   <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                     <span className="bg-brand-accent/20 border border-brand-accent/30 px-3 py-1 rounded-full text-[10px] font-black tracking-widest text-brand-accent uppercase">{formData.role}</span>
+                     <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[10px] font-mono text-brand-dim">{formData.email}</span>
+                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4 p-6 bg-brand-glass rounded-3xl border border-brand-border">
-                <div className="flex justify-between items-center border-b border-brand-border pb-3 mb-4">
-                  <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-accent">Aviation</h4>
-                  <button onClick={() => setStep(2)} className="text-[8px] uppercase font-bold text-brand-dim hover:text-white transition-colors">Edit</button>
+              {/* Identity Details */}
+              <div className="space-y-4 p-6 bg-brand-glass rounded-[2rem] border border-brand-border relative">
+                <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
+                  <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-accent">Personal Profile</h4>
+                  <button onClick={() => setStep(1)} className="text-[10px] uppercase font-bold text-brand-dim hover:text-brand-accent transition-colors">Edit</button>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] text-brand-dim uppercase">Last Op: <span className="text-white font-bold ml-2">{formData.lastOperator}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Last Flt: <span className="text-white font-bold ml-2">{formData.lastFlightDate}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">EASA: <span className="text-white font-bold ml-2">{formData.hasEasa === 'yes' ? `YES (${formData.easaRef})` : 'NO'}</span></p>
-                  <p className="text-[10px] text-brand-dim uppercase">Rotation: <span className="text-white font-bold ml-2">{formData.rotation}</span></p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Mobile</label>
+                    <p className="text-xs font-bold text-white">{formData.mobile}</p>
+                  </div>
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Weight</label>
+                    <p className="text-xs font-bold text-white">{formData.weight}kg</p>
+                  </div>
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Height</label>
+                    <p className="text-xs font-bold text-white">{formData.height}cm</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4 p-6 bg-brand-glass rounded-3xl border border-brand-border md:col-span-2">
-                <div className="flex justify-between items-center border-b border-brand-border pb-3 mb-4">
-                  <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-accent">Assets & Media</h4>
-                  <div className="flex gap-4">
-                    <button onClick={() => setStep(3)} className="text-[8px] uppercase font-bold text-brand-dim hover:text-white transition-colors">Edit Video</button>
-                    <button onClick={() => setStep(4)} className="text-[8px] uppercase font-bold text-brand-dim hover:text-white transition-colors">Edit Docs</button>
+              {/* Aviation Details */}
+              <div className="space-y-4 p-6 bg-brand-glass rounded-[2rem] border border-brand-border">
+                <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
+                  <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-accent">Aviation Logistics</h4>
+                  <button onClick={() => setStep(2)} className="text-[10px] uppercase font-bold text-brand-dim hover:text-brand-accent transition-colors">Edit</button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Last Flight</label>
+                    <p className="text-xs font-bold text-white">{formData.lastFlightDate}</p>
+                  </div>
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Operator</label>
+                    <p className="text-xs font-bold text-white">{formData.lastOperator}</p>
+                  </div>
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Base Port</label>
+                    <p className="text-xs font-bold text-white">{formData.nearestAirport}</p>
+                  </div>
+                  <div>
+                    <label className="text-[8px] uppercase font-bold text-brand-dim block mb-1">Rotation</label>
+                    <p className="text-xs font-bold text-white truncate">{formData.rotation}</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.docs.map(d => (
-                    <span key={d} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[8px] text-brand-dim">{d}</span>
-                  ))}
-                </div>
-                {videoBase64 && (
-                  <div className="flex items-center gap-2 mt-4 text-brand-accent">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="text-[8px] uppercase font-black tracking-widest">Video Stream Ready</span>
+              </div>
+
+              {/* Asset Playback */}
+              <div className="md:col-span-2 space-y-6">
+                <div className="p-8 bg-brand-card rounded-[2.5rem] border border-brand-border overflow-hidden relative">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-brand-accent shadow-[0_0_10px_rgba(0,242,255,1)]" />
+                      <h4 className="text-xs uppercase font-black tracking-widest text-white">Spotlight Check</h4>
+                    </div>
+                    <button onClick={() => setStep(3)} className="text-[10px] uppercase font-bold text-brand-dim hover:text-brand-accent transition-colors">Re-Record</button>
                   </div>
-                )}
+                  
+                  {videoBase64 ? (
+                    <div className="rounded-2xl overflow-hidden border border-brand-border bg-black aspect-video">
+                      <video 
+                        src={videoBase64} 
+                        controls 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-video bg-white/5 rounded-2xl flex items-center justify-center border border-dashed border-brand-border">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-dim">Neural Stream Missing</p>
+                    </div>
+                  )}
+
+                  <div className="mt-8">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-[10px] uppercase font-black tracking-widest text-brand-dim">Document Manifest</h4>
+                      <button onClick={() => setStep(4)} className="text-[10px] uppercase font-bold text-brand-dim hover:text-brand-accent transition-colors">Modify Docs</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                       {formData.docs.map(doc => (
+                         <div key={doc} className="px-4 py-2 bg-brand-glass border border-brand-border rounded-xl flex items-center gap-2">
+                            <FileText className="w-3 h-3 text-brand-accent" />
+                            <span className="text-[9px] font-bold text-brand-dim truncate max-w-[150px]">{doc}</span>
+                         </div>
+                       ))}
+                       {formData.docs.length === 0 && (
+                         <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">No Documents Uploaded</p>
+                       )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <button 
-              onClick={handleSubmit}
-              className="w-full py-6 bg-brand-accent text-black rounded-lg font-black uppercase tracking-[0.2em] text-lg shadow-[0_0_50px_var(--color-brand-accent-glow)] hover:scale-[1.02] transition-all"
-            >
-              Submit Application
-            </button>
+            <div className="flex flex-col md:flex-row gap-4 pt-10 border-t border-brand-border">
+               <button 
+                 onClick={() => setStep(4)}
+                 className="flex-1 py-5 border border-white/10 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/5 transition-all"
+               >
+                 Back to Docs
+               </button>
+               <button 
+                onClick={handleSubmit}
+                className="flex-[2] py-5 bg-brand-accent text-black rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-[0_0_50px_var(--color-brand-accent-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                Confirm & Submit Profile
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -936,7 +1029,17 @@ const SuccessScreen = ({ onReset }: { onReset: () => void }) => (
   </div>
 );
 
-const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[], setCandidates: (c: Candidate[] | ((prev: Candidate[]) => Candidate[])) => void }) => {
+const AdminDashboard = ({ 
+  candidates, 
+  setCandidates, 
+  onUpdate, 
+  onDelete 
+}: { 
+  candidates: Candidate[], 
+  setCandidates: any,
+  onUpdate: (id: string, updates: Partial<Candidate>) => Promise<void>,
+  onDelete: (id: string) => Promise<void>
+}) => {
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [screening, setScreening] = useState(false);
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
@@ -950,6 +1053,14 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const [sortField, setSortField] = useState<'name' | 'appliedAt' | 'score'>('appliedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Sync selected candidate with real-time updates
+  useEffect(() => {
+    if (selected) {
+      const updated = candidates.find(c => c.id === selected.id);
+      if (updated) setSelected(updated);
+    }
+  }, [candidates]);
 
   const toggleSort = (field: 'name' | 'appliedAt' | 'score') => {
     if (sortField === field) {
@@ -981,34 +1092,28 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
       return 0;
     });
 
-  const handleVideoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selected) return;
 
     const reader = new FileReader();
-    reader.onload = (loadEvent) => {
+    reader.onload = async (loadEvent) => {
       const base64 = loadEvent.target?.result as string;
-      const updatedCandidate = { ...selected, videoUrl: base64 };
-      setCandidates(prev => prev.map(c => c.id === selected.id ? updatedCandidate : c));
-      setSelected(updatedCandidate);
+      await onUpdate(selected.id, { videoUrl: base64 });
     };
     reader.readAsDataURL(file);
   };
 
-  const deleteCandidate = (id: string) => {
-    setCandidates(prev => prev.filter(c => c.id !== id));
+  const deleteCandidate = async (id: string) => {
+    await onDelete(id);
     if (selected?.id === id) setSelected(null);
     setCandidateToDelete(null);
   };
 
-  const addComment = () => {
+  const addComment = async () => {
     if (!selected || !newComment.trim()) return;
-    const updatedCandidate = {
-      ...selected,
-      hrComments: [...(selected.hrComments || []), newComment.trim()]
-    };
-    setCandidates(prev => prev.map(c => c.id === selected.id ? updatedCandidate : c));
-    setSelected(updatedCandidate);
+    const updatedComments = [...(selected.hrComments || []), newComment.trim()];
+    await onUpdate(selected.id, { hrComments: updatedComments });
     setNewComment('');
   };
 
@@ -1194,11 +1299,9 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const performAIScreening = async (candidate: Candidate) => {
     setScreening(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
       
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Act as a senior aviation recruiter. Analyze this cabin crew candidate profile (treating the provided experience data as the core CV content) and provide:
+      const prompt = `Act as a senior aviation recruiter. Analyze this cabin crew candidate profile (treating the provided experience data as the core CV content) and provide:
         1. A high-level screening summary (max 2 sentences).
         2. A detailed "CV Professional Scan" which identifies key strengths, potential gaps, and suitability for international flight operations (3-4 bullet points).
         3. A "Video Impression Analysis" focusing on perceived presence, passion for aviation, and communication clarity as suggested by their profile and intro recording (max 2 sentences).
@@ -1214,37 +1317,26 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
         Rotation Preference: ${candidate.rotation}
         Documents Uploaded: ${candidate.docs.join(', ')}
         
-        Format your response strictly as a JSON object: { "summary": string, "cvScan": string, "videoImpression": string, "score": number, "videoScore": number }`
-      });
+        Format your response strictly as a JSON object: { "summary": string, "cvScan": string, "videoImpression": string, "score": number, "videoScore": number }`;
 
-      const resText = response.text || '{ "summary": "Analysis complete.", "cvScan": "Competitive aviation profile.", "videoImpression": "Professional and engaging video presence.", "score": 85, "videoScore": 88 }';
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt
+      });
+      const resText = response.text || '{}';
       const cleanJson = resText.replace(/```json|```/g, '').trim();
       const aiResult = JSON.parse(cleanJson);
 
-      setCandidates(prev => prev.map(c => 
-        c.id === candidate.id ? { 
-          ...c, 
-          aiSummary: aiResult.summary, 
-          cvAnalysis: aiResult.cvScan, 
-          videoAnalysis: aiResult.videoImpression,
-          videoScore: aiResult.videoScore,
-          score: aiResult.score, 
-          status: 'Screened' 
-        } : c
-      ));
-      if (selected?.id === candidate.id) {
-        setSelected(prev => prev ? { 
-          ...prev, 
-          aiSummary: aiResult.summary, 
-          cvAnalysis: aiResult.cvScan, 
-          videoAnalysis: aiResult.videoImpression,
-          videoScore: aiResult.videoScore,
-          score: aiResult.score, 
-          status: 'Screened' 
-        } : null);
-      }
-    } catch (err) {
-      console.error("AI Error:", err);
+      await onUpdate(candidate.id, { 
+        aiSummary: aiResult.summary, 
+        cvAnalysis: aiResult.cvScan, 
+        videoAnalysis: aiResult.videoImpression,
+        videoScore: aiResult.videoScore,
+        score: aiResult.score, 
+        status: 'Screened' 
+      });
+    } catch (error) {
+      console.error("AI Error:", error);
     } finally {
       setScreening(false);
     }
@@ -1998,37 +2090,57 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
 
 export default function App() {
   const [view, setView] = useState<ViewState>('splash');
-  const [isStorageReady, setIsStorageReady] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
 
-  // Hydrate candidates from storage (IndexedDB with LocalStorage fallback)
+  // Real-time Firestore Sync
   useEffect(() => {
-    const hydrate = async () => {
-      const saved = await loadCandidates();
-      if (saved && Array.isArray(saved) && saved.length > 0) {
-        setCandidates(saved);
-      }
-      setIsStorageReady(true);
-    };
-    hydrate();
+    const q = query(collection(db, 'candidates'), orderBy('appliedAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const cands = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as Candidate[];
+      setCandidates(cands);
+    }, (error) => {
+      console.error("Firestore Sync Error:", error);
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Persist candidates whenever they change
-  useEffect(() => {
-    if (isStorageReady) {
-      saveCandidates(candidates);
+  const handleApply = async (newCand: Partial<Candidate>) => {
+    try {
+      const candidateData = {
+        ...newCand,
+        status: 'Pending',
+        appliedAt: new Intl.DateTimeFormat('en-CA').format(new Date()), // YYYY-MM-DD
+        createdAt: serverTimestamp(),
+        docs: newCand.docs || [],
+        hrComments: []
+      };
+      
+      await addDoc(collection(db, 'candidates'), candidateData);
+      setView('success');
+    } catch (error) {
+      console.error("Submission Error:", error);
+      alert("Application submission failed. Please try again.");
     }
-  }, [candidates, isStorageReady]);
+  };
 
-  const handleApply = (newCand: Partial<Candidate>) => {
-    const candidate: Candidate = {
-      ...newCand as any,
-      id: Date.now().toString(),
-      status: 'Pending',
-      docs: newCand.docs || []
-    };
-    setCandidates(prev => [candidate, ...prev]);
-    setView('success');
+  const updateCandidate = async (id: string, updates: Partial<Candidate>) => {
+    try {
+      const candRef = doc(db, 'candidates', id);
+      await updateDoc(candRef, updates);
+    } catch (error) {
+      console.error("Update Error:", error);
+    }
+  };
+
+  const deleteCandidate = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'candidates', id));
+    } catch (error) {
+      console.error("Delete Error:", error);
+    }
   };
 
   return (
@@ -2088,7 +2200,12 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <AdminDashboard candidates={candidates} setCandidates={setCandidates} />
+              <AdminDashboard 
+                candidates={candidates} 
+                setCandidates={setCandidates} 
+                onUpdate={updateCandidate}
+                onDelete={deleteCandidate}
+              />
             </motion.div>
           )}
         </AnimatePresence>

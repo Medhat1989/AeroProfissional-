@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: candidates
+    // Fields:
+    //   - id, name, email, mobile, role, height, weight, lastFlightDate
+    //   - lastOperator, nearestAirport, isSenior, hasEasa, easaRef
+    //   - hasEasaMedical, rotation, docs, docUrls, photoUrl, videoUrl
+    //   - appliedAt, status, score, screeningResult, hrComments, uid
+    //
+    // ===============================================================
+
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // For this demo/recruitment context, we allow all authenticated users to read/write to candidates
+      // In a production app, we would restrict listing/updates to HR accounts.
+      return isAuthenticated();
+    }
+
+    function isValidCandidate(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.status in ['Pending', 'Verified', 'Rejected'];
+    }
+
+    match /candidates/{candidateId} {
+      // Allow creation by anyone (public application) or authenticated users
+      allow create: if isValidCandidate(request.resource.data);
+      
+      // Allow reading and updating by authenticated users (HR Console)
+      allow read, update: if isAdmin();
+      
+      // Allow deletion only by authenticated users
+      allow delete: if isAdmin();
+    }
+  }
+}

@@ -22,9 +22,12 @@ import {
   ShieldCheck,
   Star,
   Download,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+
+import { PDFDocument } from 'pdf-lib';
 
 // --- Types ---
 type ViewState = 'landing' | 'apply' | 'admin' | 'success';
@@ -657,24 +660,28 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                     onChange={(e) => {
                       if (e.target.files?.[0]) {
                         const file = e.target.files[0];
-                        const url = URL.createObjectURL(file);
-                        const filename = `${upload.label}: ${file.name}`;
-                        
-                        setFormData(prev => {
-                          const newDocs = [...prev.docs];
-                          if (!newDocs.includes(filename)) {
-                            newDocs.push(filename);
-                          }
-                          const newDocUrls = { ...prev.docUrls, [filename]: url };
+                        const reader = new FileReader();
+                        reader.onload = (loadEvent) => {
+                          const base64 = loadEvent.target?.result as string;
+                          const filename = `${upload.label}: ${file.name}`;
                           
-                          // Auto-update photoUrl if it's the "Recent Photograph"
-                          let newPhotoUrl = prev.photoUrl;
-                          if (upload.id === 'photo') {
-                            newPhotoUrl = url;
-                          }
-                          
-                          return { ...prev, docs: newDocs, docUrls: newDocUrls, photoUrl: newPhotoUrl };
-                        });
+                          setFormData(prev => {
+                            const newDocs = [...prev.docs];
+                            if (!newDocs.includes(filename)) {
+                              newDocs.push(filename);
+                            }
+                            const newDocUrls = { ...prev.docUrls, [filename]: base64 };
+                            
+                            // Auto-update photoUrl if it's the "Recent Photograph"
+                            let newPhotoUrl = prev.photoUrl;
+                            if (upload.id === 'photo') {
+                              newPhotoUrl = base64;
+                            }
+                            
+                            return { ...prev, docs: newDocs, docUrls: newDocUrls, photoUrl: newPhotoUrl };
+                          });
+                        };
+                        reader.readAsDataURL(file);
                       }
                     }}
                   />
@@ -809,7 +816,14 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [previewAsset, setPreviewAsset] = useState<{ url: string, name: string } | null>(null);
+  const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
+
+  const deleteCandidate = (id: string) => {
+    setCandidates(prev => prev.filter(c => c.id !== id));
+    if (selected?.id === id) setSelected(null);
+    setCandidateToDelete(null);
+  };
 
   const addComment = () => {
     if (!selected || !newComment.trim()) return;
@@ -823,9 +837,9 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   };
 
   const downloadAsPdf = async (candidate: Candidate) => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const width = pdf.internal.pageSize.getWidth();
-    const height = pdf.internal.pageSize.getHeight();
+    const mainJsPDF = new jsPDF('p', 'mm', 'a4');
+    const width = mainJsPDF.internal.pageSize.getWidth();
+    const height = mainJsPDF.internal.pageSize.getHeight();
     
     // Page 1: Main Dossier Summary
     if (pdfRef.current) {
@@ -838,14 +852,12 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
           scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
-          // Only capture the summary part (ignore the gallery in the single-page capture)
-          // We'll add documents manually as new pages
         });
         const imgData = canvas.toDataURL('image/png', 1.0);
-        const imgProps = pdf.getImageProperties(imgData);
+        const imgProps = mainJsPDF.getImageProperties(imgData);
         const pdfPageHeight = (imgProps.height * width) / imgProps.width;
         
-        pdf.addImage(imgData, 'PNG', 0, 0, width, pdfPageHeight);
+        mainJsPDF.addImage(imgData, 'PNG', 0, 0, width, pdfPageHeight);
       } catch (error) {
         console.error("Summary page capture failed:", error);
       } finally {
@@ -853,9 +865,19 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
       }
     }
 
-    // Subsequent Pages: Each Document in Full Detail
+    // Process all Documents
     const docEntries = Object.entries(candidate.docUrls || {});
+    const pdfToMerge: string[] = [];
+
     for (const [name, url] of docEntries) {
+      const isPdf = url.startsWith('data:application/pdf') || name.toLowerCase().includes('.pdf');
+      
+      if (isPdf) {
+        pdfToMerge.push(url);
+        continue;
+      }
+
+      // Handle as Image in jsPDF
       try {
         const img = new Image();
         img.src = url;
@@ -866,31 +888,28 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
           img.onerror = reject;
         });
 
-        pdf.addPage();
+        mainJsPDF.addPage();
         
-        // Header for the document page
-        pdf.setFillColor(248, 249, 250);
-        pdf.rect(0, 0, width, 25, 'F');
-        pdf.setDrawColor(0, 242, 255);
-        pdf.setLineWidth(1);
-        pdf.line(0, 25, width, 25);
+        // Header
+        mainJsPDF.setFillColor(248, 249, 250);
+        mainJsPDF.rect(0, 0, width, 25, 'F');
+        mainJsPDF.setDrawColor(0, 242, 255);
+        mainJsPDF.setLineWidth(1);
+        mainJsPDF.line(0, 25, width, 25);
         
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor(0, 184, 204);
-        pdf.text("AEROPROFESSIONAL VERIFIED ASSET", 15, 12);
+        mainJsPDF.setFont("helvetica", "bold");
+        mainJsPDF.setFontSize(10);
+        mainJsPDF.setTextColor(0, 184, 204);
+        mainJsPDF.text("AEROPROFESSIONAL VERIFIED ASSET", 15, 12);
         
-        pdf.setFontSize(14);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(name.split(': ')[0], 15, 20);
+        mainJsPDF.setFontSize(14);
+        mainJsPDF.setTextColor(0, 0, 0);
+        mainJsPDF.text(name.split(': ')[0], 15, 20);
 
-        // Calculate aspect ratio to fit page while maintaining quality
         const availableHeight = height - 40;
         const availableWidth = width - 30;
-        
         let targetWidth = img.width;
         let targetHeight = img.height;
-        
         const ratio = Math.min(availableWidth / targetWidth, availableHeight / targetHeight);
         targetWidth *= ratio;
         targetHeight *= ratio;
@@ -898,17 +917,50 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
         const xOffset = (width - targetWidth) / 2;
         const yOffset = 30 + (availableHeight - targetHeight) / 2;
         
-        pdf.addImage(img, 'JPEG', xOffset, yOffset, targetWidth, targetHeight, undefined, 'FAST');
+        // Auto-detect format from base64 if possible
+        const format = url.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        mainJsPDF.addImage(img, format, xOffset, yOffset, targetWidth, targetHeight, undefined, 'FAST');
         
-        pdf.setFontSize(8);
-        pdf.setTextColor(150, 150, 150);
-        pdf.text(`Digital Fingerprint: ${name.split(': ')[1] || 'Aviation Manifest'}`, 15, height - 10);
+        mainJsPDF.setFontSize(8);
+        mainJsPDF.setTextColor(150, 150, 150);
+        mainJsPDF.text(`Digital Fingerprint: ${name.split(': ')[1] || 'Aviation Manifest'}`, 15, height - 10);
       } catch (err) {
-        console.warn(`Could not add document ${name} to PDF:`, err);
+        console.warn(`Could not add image asset ${name} to PDF:`, err);
       }
     }
 
-    pdf.save(`AeroProfessional_Dossier_Full_${candidate.name.replace(/\s+/g, '_')}.pdf`);
+    // Final Stage: Merge with PDF-LIB
+    try {
+      const summaryBytes = mainJsPDF.output('arraybuffer');
+      const mergedPdf = await PDFDocument.load(summaryBytes);
+
+      for (const pdfDataUri of pdfToMerge) {
+        try {
+          // fetch works for data URIs
+          const response = await fetch(pdfDataUri);
+          const pdfBytes = await response.arrayBuffer();
+          const docToEmbed = await PDFDocument.load(pdfBytes);
+          const pages = await mergedPdf.copyPages(docToEmbed, docToEmbed.getPageIndices());
+          pages.forEach(p => mergedPdf.addPage(p));
+        } catch (mergeErr) {
+          console.error("Failed to merge PDF asset:", mergeErr);
+        }
+      }
+
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `AeroProfessional_Dossier_Full_${candidate.name.replace(/\s+/g, '_')}.pdf`;
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+    } catch (err) {
+      console.error("PDF-LIB merging failed, falling back to basic PDF:", err);
+      mainJsPDF.save(`AeroProfessional_Dossier_Partial_${candidate.name.replace(/\s+/g, '_')}.pdf`);
+    }
   };
 
   const downloadFileAsPdf = async (url: string, fileName: string) => {
@@ -1022,11 +1074,22 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="font-bold text-white text-lg">{candidate.name}</div>
-                {candidate.score && (
-                  <div className={`text-[10px] px-2 py-1 rounded font-black tracking-widest ${selected?.id === candidate.id ? 'bg-brand-accent text-black' : 'bg-brand-dim/20 text-brand-dim'}`}>
-                    {candidate.score}% MATCH
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCandidateToDelete(candidate);
+                    }}
+                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  {candidate.score && (
+                    <div className={`text-[10px] px-2 py-1 rounded font-black tracking-widest ${selected?.id === candidate.id ? 'bg-brand-accent text-black' : 'bg-brand-dim/20 text-brand-dim'}`}>
+                      {candidate.score}% MATCH
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="text-xs text-brand-dim mb-4">{candidate.role}</div>
               <div className="flex items-center justify-between border-t border-brand-border pt-4">
@@ -1080,6 +1143,13 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
                   >
                     {screening ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                     {screening ? 'Neural Screening...' : 'Execute AI Scan'}
+                  </button>
+                  <button 
+                    onClick={() => setCandidateToDelete(selected)}
+                    className="px-4 py-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-sm hover:bg-red-500/20 transition-all flex items-center justify-center"
+                    title="Delete Candidate"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -1478,6 +1548,50 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
                   className="px-12 py-4 bg-brand-accent text-black rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-3 hover:scale-105 transition-all"
                 >
                   <Download className="w-4 h-4" /> Download as PDF
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {candidateToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-6"
+          >
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setCandidateToDelete(null)} />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-brand-card border border-brand-border rounded-[2rem] p-10 overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">Purge Candidate Profile?</h3>
+              <p className="text-brand-dim text-sm leading-relaxed mb-8">
+                You are about to permanently delete <span className="text-white font-bold">{candidateToDelete.name}'s</span> entire dossier and verification history from the AeroProfessional index. This action cannot be undone.
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setCandidateToDelete(null)}
+                  className="flex-1 py-4 bg-brand-glass text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => deleteCandidate(candidateToDelete.id)}
+                  className="flex-1 py-4 bg-red-500 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-[0_0_30px_rgba(239,68,68,0.3)] hover:scale-[1.02] transition-all"
+                >
+                  Confirm Purge
                 </button>
               </div>
             </motion.div>

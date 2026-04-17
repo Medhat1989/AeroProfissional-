@@ -26,8 +26,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-
 import { PDFDocument } from 'pdf-lib';
+import { saveCandidates, loadCandidates } from './lib/storage';
 
 // --- Types ---
 type ViewState = 'landing' | 'apply' | 'admin' | 'success';
@@ -1761,37 +1761,36 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
 
 export default function App() {
   const [view, setView] = useState<ViewState>('landing');
-  const [candidates, setCandidates] = useState<Candidate[]>(() => {
-    const saved = localStorage.getItem('aeroprofessional_candidates');
-    if (saved) {
-      try {
-        // Hydrate from localStorage
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to hydrate candidates:", e);
-        return MOCK_CANDIDATES;
-      }
-    }
-    return MOCK_CANDIDATES;
-  });
+  const [isStorageReady, setIsStorageReady] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES);
 
-  // Persist candidates to localStorage whenever they change
+  // Hydrate candidates from storage (IndexedDB with LocalStorage fallback)
   useEffect(() => {
-    try {
-      localStorage.setItem('aeroprofessional_candidates', JSON.stringify(candidates));
-    } catch (e) {
-      console.warn("Storage limit exceeded. Large media files (videos) may not persist after refresh.", e);
+    const hydrate = async () => {
+      const saved = await loadCandidates();
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        setCandidates(saved);
+      }
+      setIsStorageReady(true);
+    };
+    hydrate();
+  }, []);
+
+  // Persist candidates whenever they change
+  useEffect(() => {
+    if (isStorageReady) {
+      saveCandidates(candidates);
     }
-  }, [candidates]);
+  }, [candidates, isStorageReady]);
 
   const handleApply = (newCand: Partial<Candidate>) => {
     const candidate: Candidate = {
       ...newCand as any,
-      id: (candidates.length + 1).toString(),
+      id: Date.now().toString(),
       status: 'Pending',
       docs: newCand.docs || []
     };
-    setCandidates([candidate, ...candidates]);
+    setCandidates(prev => [candidate, ...prev]);
     setView('success');
   };
 

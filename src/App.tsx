@@ -779,7 +779,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
               onClick={handleSubmit}
               className="w-full py-6 bg-brand-accent text-black rounded-lg font-black uppercase tracking-[0.2em] text-lg shadow-[0_0_50px_var(--color-brand-accent-glow)] hover:scale-[1.02] transition-all"
             >
-              Confirm and Deploy Profile
+              Submit Application
             </button>
           </motion.div>
         )}
@@ -797,9 +797,9 @@ const SuccessScreen = ({ onReset }: { onReset: () => void }) => (
     >
       <CheckCircle2 className="w-10 h-10 text-brand-accent -rotate-45" />
     </motion.div>
-    <h2 className="text-6xl font-black tracking-tighter mb-6 text-white">PROFILE DEPLOYED.</h2>
+    <h2 className="text-6xl font-black tracking-tighter mb-6 text-white">SUBMIT SUCCESSFUL.</h2>
     <p className="text-xl text-brand-dim mb-16 max-w-lg mx-auto leading-relaxed">
-      Your transmission has been encrypted and received. Our neural screening engines are now processing your application.
+      Thank you for your application to AeroProfissional. Your profile has been successfully uploaded to our recruitment index.
     </p>
     <button 
       onClick={onReset}

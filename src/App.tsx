@@ -23,14 +23,19 @@ import {
   Star,
   Download,
   X,
-  Trash2
+  Trash2,
+  ArrowUpDown,
+  Cpu,
+  Zap,
+  Brain,
+  Menu
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { PDFDocument } from 'pdf-lib';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
 // --- Types ---
-type ViewState = 'landing' | 'apply' | 'admin' | 'success';
+type ViewState = 'splash' | 'landing' | 'apply' | 'admin' | 'success';
 
 interface Candidate {
   id: string;
@@ -111,119 +116,231 @@ const MOCK_CANDIDATES: Candidate[] = [
 
 // --- Components ---
 
-const Header = ({ view, setView }: { view: ViewState, setView: (v: ViewState) => void }) => (
-  <nav className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-md border-b border-brand-border h-20 flex items-center justify-between px-12">
-    <div 
-      className="flex items-center gap-4 cursor-pointer group" 
-      onClick={() => setView('landing')}
-    >
-      <img 
-        src="https://i.ibb.co/HL31wDVs/aeroprofessional-limited-logo-removebg-preview.png" 
-        alt="AeroProfissional" 
-        className="h-10 w-auto brightness-125 hover:scale-105 transition-transform"
-        referrerPolicy="no-referrer"
-      />
-      <span className="font-sans font-extrabold text-xl tracking-[0.1em] text-brand-accent uppercase hidden sm:block">AeroProfissional</span>
-    </div>
-    <div className="flex items-center gap-12">
-      <button 
-        onClick={() => setView('landing')}
-        className={`text-xs uppercase tracking-widest font-bold ${view === 'landing' ? 'text-white' : 'text-brand-dim hover:text-white'} transition-colors`}
-      >
-        Solutions
-      </button>
-      <button 
-        onClick={() => setView('admin')}
-        className={`text-xs uppercase tracking-widest font-bold ${view === 'admin' ? 'text-white' : 'text-brand-dim hover:text-white'} transition-all flex items-center gap-2`}
-      >
-        <LayoutDashboard className="w-4 h-4" />
-        Admin Console
-      </button>
-      <button 
-        onClick={() => setView('apply')}
-        className="bg-brand-accent text-black px-8 py-3 rounded-sm text-xs font-black uppercase tracking-wider hover:scale-105 transition-all shadow-[0_0_20px_var(--color-brand-accent-glow)] flex items-center gap-3"
-      >
-        Open Profile
-        <ArrowRight className="w-4 h-4" />
-      </button>
-    </div>
-  </nav>
-);
+const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 4000);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
 
-const LandingHero = ({ onStart }: { onStart: () => void }) => (
-  <div className="pt-40 pb-20 px-12 max-w-7xl mx-auto">
-    <div className="grid lg:grid-cols-2 gap-16 items-center">
+  return (
+    <div className="fixed inset-0 z-[200] bg-brand-bg flex items-center justify-center overflow-hidden">
+      {/* Background Atmosphere */}
       <motion.div 
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ duration: 2 }}
+        className="absolute inset-0"
       >
-        <h1 className="text-6xl md:text-8xl font-sans font-bold tracking-tight leading-[1.1] mb-8 bg-gradient-to-br from-white to-brand-dim bg-clip-text text-transparent">
-          Show Them<br />
-          The Real You.
-        </h1>
-        <p className="text-xl text-brand-dim max-w-lg mb-12 leading-relaxed">
-          Streamline your professional entry. One 2-minute recording, encrypted document storage, and instant AI-driven screening for top-tier roles.
-        </p>
-        
-        <div className="flex flex-col gap-4 mb-12">
-          {[
-            "120-Second High-Definition Video Profiling",
-            "Secure ISO-27001 Document Vault",
-            "Automated Candidate Scorecard Generation"
-          ].map((feat, i) => (
-            <div key={i} className="flex items-center gap-4 bg-brand-glass border-l-2 border-brand-accent p-4 rounded-r-lg">
-               <CheckCircle2 className="w-4 h-4 text-brand-accent" />
-               <span className="text-sm font-medium text-brand-text">{feat}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <button 
-            onClick={onStart}
-            className="w-full sm:w-auto px-10 py-5 bg-brand-accent text-black rounded-sm text-sm font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_30px_var(--color-brand-accent-glow)] flex items-center justify-center gap-3"
-          >
-            Open Profile
-            <ArrowRight className="w-5 h-5" />
-          </button>
-          <button className="w-full sm:w-auto px-10 py-5 border border-brand-border bg-transparent text-brand-text rounded-sm text-sm font-black uppercase tracking-widest hover:bg-brand-glass transition-all">
-            Watch Demo
-          </button>
-        </div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-brand-accent/20 rounded-full blur-[120px]" />
       </motion.div>
 
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="relative"
-      >
-        <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-brand-card border border-brand-border shadow-[0_40px_80px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      <div className="relative flex flex-col items-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          className="relative mb-8"
+        >
+          <div className="absolute inset-0 bg-brand-accent/40 blur-2xl rounded-full animate-pulse" />
           <img 
-            src="https://picsum.photos/seed/recruitment/1200/900" 
-            className="w-full h-full object-cover opacity-60"
-            alt="Landing"
+            src="https://i.ibb.co/HL31wDVs/aeroprofessional-limited-logo-removebg-preview.png" 
+            alt="AeroProfissional" 
+            className="h-32 w-auto relative z-10 brightness-125"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-brand-bg/80 via-transparent to-transparent" />
-          
-          <div className="absolute inset-0 p-8 flex flex-col justify-between pointer-events-none">
-            <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full w-fit border border-red-500/30">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Live Recording</span>
-            </div>
-            
-            <div className="flex justify-between items-end">
-              <div className="font-mono text-3xl text-white tracking-tighter">01:42</div>
-              <div className="text-right">
-                 <div className="text-lg font-bold text-white">Sarah Jenkins</div>
-                 <div className="text-[10px] uppercase tracking-widest text-brand-accent font-black">Senior Cabin Crew</div>
-              </div>
-            </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8, duration: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <h1 className="text-2xl font-black uppercase tracking-[0.4em] text-white">AeroProfissional</h1>
+          <div className="flex items-center gap-3">
+            <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-brand-accent" />
+            <span className="text-[10px] font-black uppercase tracking-[0.6em] text-brand-accent">Neural Intelligence</span>
+            <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-brand-accent" />
           </div>
+        </motion.div>
+
+        {/* Loading Progress Bar */}
+        <div className="absolute bottom-[-100px] w-64 h-[2px] bg-white/5 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 3.5, ease: "easeInOut" }}
+            className="h-full bg-brand-accent shadow-[0_0_15px_rgba(0,242,255,1)]"
+          />
         </div>
+      </div>
+    </div>
+  );
+};
+
+const Header = ({ view, setView }: { view: ViewState, setView: (v: ViewState) => void }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  if (view === 'splash') return null;
+
+  const menuItems = [
+    { label: 'Solutions', action: () => setView('landing') },
+    { label: 'Admin Console', action: () => setView('admin'), icon: <LayoutDashboard className="w-4 h-4" /> }
+  ];
+
+  const handleAction = (cb: () => void) => {
+    cb();
+    setIsMenuOpen(false);
+  };
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/50 backdrop-blur-md border-b border-brand-border h-20 flex items-center justify-between px-6 md:px-12">
+      <div 
+        className="flex items-center gap-4 cursor-pointer group" 
+        onClick={() => setView('landing')}
+      >
+        <img 
+          src="https://i.ibb.co/HL31wDVs/aeroprofessional-limited-logo-removebg-preview.png" 
+          alt="AeroProfissional" 
+          className="h-10 w-auto brightness-125 hover:scale-105 transition-transform"
+          referrerPolicy="no-referrer"
+        />
+        <span className="font-sans font-extrabold text-xl tracking-[0.1em] text-brand-accent uppercase hidden lg:block">AeroProfissional</span>
+      </div>
+
+      {/* Desktop Menu */}
+      <div className="hidden md:flex items-center gap-12">
+        <button 
+          onClick={() => setView('landing')}
+          className={`text-xs uppercase tracking-widest font-bold ${view === 'landing' ? 'text-white' : 'text-brand-dim hover:text-white'} transition-colors`}
+        >
+          Solutions
+        </button>
+        <button 
+          onClick={() => setView('admin')}
+          className={`text-xs uppercase tracking-widest font-bold ${view === 'admin' ? 'text-white' : 'text-brand-dim hover:text-white'} transition-all flex items-center gap-2`}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          Admin Console
+        </button>
+        <button 
+          onClick={() => setView('apply')}
+          className="bg-brand-accent text-black px-8 py-3 rounded-sm text-xs font-black uppercase tracking-wider hover:scale-105 transition-all shadow-[0_0_20px_var(--color-brand-accent-glow)] flex items-center gap-3"
+        >
+          Open Profile
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Mobile Menu Trigger */}
+      <button 
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className="md:hidden w-10 h-10 flex items-center justify-center text-white"
+      >
+        {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+      </button>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 left-0 right-0 bg-brand-bg/95 backdrop-blur-3xl border-b border-brand-border p-8 flex flex-col gap-8 md:hidden shadow-2xl"
+          >
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => handleAction(item.action)}
+                className="text-left text-sm uppercase tracking-widest font-black text-brand-dim hover:text-brand-accent flex items-center gap-4 py-2"
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+            <button 
+              onClick={() => handleAction(() => setView('apply'))}
+              className="bg-brand-accent text-black px-8 py-4 rounded-xl text-xs font-black uppercase tracking-wider shadow-xl flex items-center justify-center gap-3"
+            >
+              Open Profile
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
+  );
+};
+
+const LandingHero = ({ onStart, onAdmin }: { onStart: () => void, onAdmin: () => void }) => (
+  <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
+    {/* Dynamic Background Elements */}
+    <div className="absolute top-1/4 -right-20 w-96 h-96 bg-brand-accent/5 rounded-full blur-3xl" />
+    <div className="absolute bottom-1/4 -left-20 w-96 h-96 bg-brand-accent/5 rounded-full blur-3xl" />
+
+    <div className="max-w-6xl w-full mx-auto relative z-10 text-center mb-20">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+      >
+        <span className="text-[10px] font-black uppercase tracking-[0.5em] text-brand-accent mb-6 block">Future of Recruitment</span>
+        <h1 className="text-5xl md:text-8xl font-sans font-bold tracking-tight leading-[1.1] mb-8 bg-gradient-to-br from-white to-brand-dim bg-clip-text text-transparent">
+          One Platform. <br />
+          Dual Gateway.
+        </h1>
+        <p className="text-lg md:text-xl text-brand-dim max-w-2xl mx-auto mb-16 leading-relaxed">
+          The industry's most advanced cabin crew screening infrastructure. 
+          Choose your access point beneath the AeroProfissional neural architecture.
+        </p>
       </motion.div>
+
+      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        {/* Candidate Access */}
+        <motion.div
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          whileHover={{ y: -10 }}
+          onClick={onStart}
+          className="group relative p-10 bg-brand-card border border-brand-border rounded-[2.5rem] cursor-pointer hover:border-brand-accent transition-all overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-brand-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-16 h-16 rounded-2xl bg-brand-accent/10 flex items-center justify-center mb-8 border border-brand-accent/20 shadow-[0_0_30px_rgba(0,242,255,0.1)] group-hover:bg-brand-accent transition-colors">
+            <User className="w-8 h-8 text-brand-accent group-hover:text-black transition-colors" />
+          </div>
+          <h3 className="text-3xl font-bold text-white mb-4">Open Profile</h3>
+          <p className="text-brand-dim text-sm leading-relaxed mb-8">
+            Begin your journey. 120-second immersive introduction, secure visual asset vault, and real-time verification pipeline.
+          </p>
+          <div className="flex items-center gap-3 text-brand-accent font-black uppercase tracking-widest text-[10px]">
+            Start Application <ArrowRight className="w-4 h-4" />
+          </div>
+        </motion.div>
+
+        {/* Admin Console Access */}
+        <motion.div
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          whileHover={{ y: -10 }}
+          onClick={onAdmin}
+          className="group relative p-10 bg-brand-card border border-brand-border rounded-[2.5rem] cursor-pointer hover:border-brand-accent transition-all overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-brand-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-16 h-16 rounded-2xl bg-brand-accent/10 flex items-center justify-center mb-8 border border-brand-accent/20 shadow-[0_0_30px_rgba(0,242,255,0.1)] group-hover:bg-brand-accent transition-colors">
+            <LayoutDashboard className="w-8 h-8 text-brand-accent group-hover:text-black transition-colors" />
+          </div>
+          <h3 className="text-3xl font-bold text-white mb-4">Admin Console</h3>
+          <p className="text-brand-dim text-sm leading-relaxed mb-8">
+            Access the neural pipeline. Monitor applications, execute AI screenings, and export high-fidelity candidate dossiers.
+          </p>
+          <div className="flex items-center gap-3 text-brand-accent font-black uppercase tracking-widest text-[10px]">
+            Enter Dashboard <ArrowRight className="w-4 h-4" />
+          </div>
+        </motion.div>
+      </div>
     </div>
   </div>
 );
@@ -421,14 +538,14 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-32 px-6">
+    <div className="max-w-3xl mx-auto py-20 px-6 sm:py-32">
       <div className="mb-12">
-        <div className="flex items-center gap-4 mb-12">
+        <div className="flex items-center gap-2 md:gap-4 mb-8 md:mb-12">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className={`h-1 flex-1 transition-all ${step >= i ? 'bg-brand-accent' : 'bg-brand-border'}`} />
+            <div key={i} className={`h-1 flex-1 transition-all rounded-full ${step >= i ? 'bg-brand-accent' : 'bg-brand-border'}`} />
           ))}
         </div>
-        <h2 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-white to-brand-dim bg-clip-text text-transparent">
+        <h2 className="text-3xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-white to-brand-dim bg-clip-text text-transparent">
           {step === 1 && "Personal Profile."}
           {step === 2 && "Aviation Experience."}
           {step === 3 && "The Spotlight."}
@@ -826,8 +943,43 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const [newComment, setNewComment] = useState('');
   const [previewAsset, setPreviewAsset] = useState<{ url: string, name: string } | null>(null);
   const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
+
+  const [sortField, setSortField] = useState<'name' | 'appliedAt' | 'score'>('appliedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const toggleSort = (field: 'name' | 'appliedAt' | 'score') => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc'); // Default to desc for new field
+    }
+  };
+
+  const filteredAndSortedCandidates = [...candidates]
+    .filter(c => 
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      c.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.nearestAirport?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      let valA: any = a[sortField];
+      let valB: any = b[sortField];
+
+      if (sortField === 'score') {
+        valA = valA || 0;
+        valB = valB || 0;
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const handleVideoUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1099,131 +1251,203 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   };
 
   return (
-    <div className="pt-32 px-12 max-w-7xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-16">
+    <div className="pt-24 md:pt-32 px-6 md:px-12 max-w-7xl mx-auto pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 md:mb-16">
         <div>
-          <h2 className="text-5xl font-bold tracking-tight mb-3 text-white">Console Pipeline</h2>
-          <p className="text-brand-dim">Neural candidate screening & profile verification.</p>
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-3 text-white">Console Pipeline</h2>
+          <p className="text-brand-dim text-sm">Neural candidate screening & profile verification.</p>
         </div>
-        <div className="flex gap-4">
-          <div className="bg-brand-glass px-6 py-3 rounded-xl flex items-center gap-3 border border-brand-border">
+        <div className="flex w-full md:w-auto gap-4">
+          <div className="flex-1 md:flex-none bg-brand-glass px-6 py-3 rounded-xl flex items-center gap-3 border border-brand-border">
             <Users className="w-5 h-5 text-brand-accent" />
-            <span className="font-bold text-white">{candidates.length} <span className="text-brand-dim font-medium uppercase tracking-widest text-[10px] ml-2">Total Pool</span></span>
+            <span className="font-bold text-white text-sm md:text-base">{candidates.length} <span className="text-brand-dim font-medium uppercase tracking-widest text-[8px] md:text-[10px] ml-2">Total Pool</span></span>
           </div>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="md:hidden p-3 bg-brand-accent text-black rounded-xl"
+          >
+            <Users className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-12">
+      <div className="grid lg:grid-cols-3 gap-8 md:gap-12 relative items-start">
         {/* Sidebar List */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="relative mb-8">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-dim" />
-            <input 
-              type="text" 
-              placeholder="Query candidate index..."
-              className="w-full pl-11 pr-4 py-4 bg-brand-glass rounded-xl outline-none border border-brand-border focus:border-brand-accent transition-all text-white placeholder:text-brand-dim/50"
-            />
+        <div className={`lg:col-span-1 space-y-4 ${sidebarOpen ? 'block' : 'hidden lg:block'} fixed lg:relative inset-0 z-[60] lg:z-auto bg-brand-bg lg:bg-transparent p-6 lg:p-0`}>
+          <div className="flex items-center justify-between md:hidden mb-6">
+             <h3 className="text-xl font-bold text-white uppercase tracking-widest text-[10px]">Candidate Archive</h3>
+             <button onClick={() => setSidebarOpen(false)} className="p-2 bg-white/5 rounded-lg text-white">
+                <X className="w-5 h-5" />
+             </button>
           </div>
-          {candidates.map(candidate => (
-            <motion.div 
-              key={candidate.id}
-              whileHover={{ x: 4 }}
-              onClick={() => setSelected(candidate)}
-              className={`p-5 rounded-2xl cursor-pointer border-l-4 transition-all ${selected?.id === candidate.id ? 'bg-brand-accent/10 border-brand-accent shadow-[0_0_20px_rgba(0,242,255,0.1)]' : 'bg-brand-glass border-transparent hover:bg-brand-glass/80'}`}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img 
-                      src={candidate.photoUrl || `https://picsum.photos/seed/${candidate.id}/100/100`}
-                      className="w-10 h-10 rounded-lg object-cover border border-white/10"
-                      alt="Avatar"
-                      referrerPolicy="no-referrer"
-                    />
-                    {candidate.videoUrl && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-brand-accent rounded-full flex items-center justify-center border-2 border-brand-bg">
-                        <Play className="w-2 h-2 text-black fill-black" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-white text-md">{candidate.name}</div>
-                    <div className="text-[9px] text-brand-dim uppercase tracking-wider">{candidate.nearestAirport}</div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCandidateToDelete(candidate);
-                    }}
-                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                  {candidate.score && (
-                    <div className={`text-[10px] px-2 py-1 rounded font-black tracking-widest ${selected?.id === candidate.id ? 'bg-brand-accent text-black' : 'bg-brand-dim/20 text-brand-dim'}`}>
-                      {candidate.score}% MATCH
-                    </div>
+          <div className="space-y-4 mb-8">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-dim" />
+              <input 
+                type="text" 
+                placeholder="Query candidate index..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-4 bg-brand-glass rounded-xl outline-none border border-brand-border focus:border-brand-accent transition-all text-white placeholder:text-brand-dim/50"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-dim mr-2 shrink-0">Sort By:</span>
+              {[
+                { id: 'name', label: 'Name' },
+                { id: 'appliedAt', label: 'Date' },
+                { id: 'score', label: 'Score' }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => toggleSort(f.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${sortField === f.id ? 'bg-brand-accent text-black shadow-[0_0_15px_rgba(0,242,255,0.3)]' : 'bg-brand-glass text-brand-dim border border-brand-border hover:border-brand-accent/40'}`}
+                >
+                  {f.label}
+                  {sortField === f.id && (
+                    <ArrowUpDown className={`w-2.5 h-2.5 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
                   )}
-                </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4 max-h-[800px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-brand-accent/20 scrollbar-track-transparent">
+            {filteredAndSortedCandidates.length > 0 ? (
+              filteredAndSortedCandidates.map(candidate => (
+                <motion.div 
+                  key={candidate.id}
+                  whileHover={{ x: 4 }}
+                  onClick={() => setSelected(candidate)}
+                  className={`p-5 rounded-2xl cursor-pointer border-l-4 transition-all ${selected?.id === candidate.id ? 'bg-brand-accent/10 border-brand-accent shadow-[0_0_20px_rgba(0,242,255,0.1)]' : 'bg-brand-glass border-transparent hover:bg-brand-glass/80'}`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <img 
+                          src={candidate.photoUrl || `https://picsum.photos/seed/${candidate.id}/100/100`}
+                          className="w-10 h-10 rounded-lg object-cover border border-white/10"
+                          alt="Avatar"
+                          referrerPolicy="no-referrer"
+                        />
+                        {candidate.videoUrl && (
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-brand-accent rounded-full flex items-center justify-center border-2 border-brand-bg">
+                            <Play className="w-2 h-2 text-black fill-black" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold text-white text-md">{candidate.name}</div>
+                        <div className="text-[9px] text-brand-dim uppercase tracking-wider">{candidate.nearestAirport}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {candidate.status === 'Pending' && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            performAIScreening(candidate);
+                          }}
+                          disabled={screening}
+                          className="p-2 bg-brand-accent/20 hover:bg-brand-accent/40 text-brand-accent rounded-lg transition-all border border-brand-accent/30 group"
+                          title="Quick Quick Neural Scan"
+                        >
+                          <Zap className={`w-3 h-3 ${screening ? 'animate-pulse' : 'group-hover:scale-125 transition-transform'}`} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCandidateToDelete(candidate);
+                        }}
+                        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      {candidate.score && (
+                        <div className={`text-[10px] px-2 py-1 rounded font-black tracking-widest ${selected?.id === candidate.id ? 'bg-brand-accent text-black' : 'bg-brand-dim/20 text-brand-dim'}`}>
+                          {candidate.score}% MATCH
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-brand-dim mb-4">{candidate.role}</div>
+                  <div className="flex items-center justify-between border-t border-brand-border pt-4">
+                    <span className={`text-[10px] uppercase tracking-[0.2em] font-black ${candidate.status === 'Pending' ? 'text-orange-400' : 'text-brand-accent'}`}>
+                      {candidate.status}
+                    </span>
+                    <span className="text-[10px] opacity-40 font-mono text-white">{candidate.appliedAt}</span>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="p-12 text-center bg-brand-glass rounded-3xl border border-brand-border border-dashed">
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand-dim/50">No candidates match iteration</p>
               </div>
-              <div className="text-xs text-brand-dim mb-4">{candidate.role}</div>
-              <div className="flex items-center justify-between border-t border-brand-border pt-4">
-                <span className={`text-[10px] uppercase tracking-[0.2em] font-black ${candidate.status === 'Pending' ? 'text-orange-400' : 'text-brand-accent'}`}>
-                  {candidate.status}
-                </span>
-                <span className="text-[10px] opacity-40 font-mono text-white">{candidate.appliedAt}</span>
-              </div>
-            </motion.div>
-          ))}
+            )}
+          </div>
         </div>
 
         {/* Main Panel */}
         <div className="lg:col-span-2">
           {selected ? (
             <div className="bg-brand-card border border-brand-border rounded-[2.5rem] p-8 md:p-12 shadow-2xl backdrop-blur-3xl">
-              <div className="flex flex-col md:flex-row justify-between items-start gap-12 mb-16">
-                <div className="flex items-center gap-8">
-                  <div className="relative">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-8 md:gap-12 mb-12 md:mb-16">
+                <div className="flex items-center gap-4 md:gap-8">
+                  <div className="relative shrink-0">
                     <img 
                       src={selected.photoUrl || `https://picsum.photos/seed/${selected.id}/200/200`} 
-                      className="w-28 h-28 rounded-2xl object-cover border-2 border-brand-border" 
+                      className="w-16 h-16 md:w-28 md:h-28 rounded-xl md:rounded-2xl object-cover border-2 border-brand-border" 
                       alt="Pfp"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-brand-accent rounded-lg flex items-center justify-center border-4 border-brand-bg">
-                      <ShieldCheck className="w-4 h-4 text-black" />
+                    <div className="absolute -bottom-1 -right-1 md:-bottom-2 md:-right-2 w-6 h-6 md:w-8 md:h-8 bg-brand-accent rounded-lg flex items-center justify-center border-2 md:border-4 border-brand-bg">
+                      <ShieldCheck className="w-3 h-3 md:w-4 md:h-4 text-black" />
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-4xl font-bold tracking-tight text-white mb-3">{selected.name}</h3>
-                    <div className="flex flex-wrap gap-3">
-                      <span className="bg-brand-accent/10 border border-brand-accent/20 px-3 py-1 rounded-sm text-[10px] uppercase font-black tracking-wider text-brand-accent">{selected.role}</span>
-                      <span className="bg-brand-glass px-3 py-1 rounded-sm text-[10px] font-mono text-brand-dim lowercase">{selected.email}</span>
-                      <span className="bg-brand-glass px-3 py-1 rounded-sm text-[10px] font-mono text-brand-dim lowercase">{selected.mobile}</span>
+                    <h3 className="text-2xl md:text-4xl font-bold tracking-tight text-white mb-2 md:mb-3">{selected.name}</h3>
+                    <div className="flex flex-wrap gap-2 md:gap-3">
+                      <span className="bg-brand-accent/10 border border-brand-accent/20 px-2 md:px-3 py-1 rounded-sm text-[8px] md:text-[10px] uppercase font-black tracking-wider text-brand-accent">{selected.role}</span>
+                      <span className="bg-brand-glass px-2 md:px-3 py-1 rounded-sm text-[8px] md:text-[10px] font-mono text-brand-dim lowercase truncate max-w-[120px] md:max-w-none">{selected.email}</span>
+                      {selected.status === 'Pending' ? (
+                        <span className="bg-orange-400/10 border border-orange-400/20 px-2 md:px-3 py-1 rounded-sm text-[8px] md:text-[10px] uppercase font-black tracking-wider text-orange-400 flex items-center gap-2">
+                          <span className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                          <span className="hidden sm:inline">Neural Scan Required</span>
+                          <span className="sm:hidden">Unscanned</span>
+                        </span>
+                      ) : (
+                        <span className="bg-brand-accent/10 border border-brand-accent/20 px-2 md:px-3 py-1 rounded-sm text-[8px] md:text-[10px] uppercase font-black tracking-wider text-brand-accent flex items-center gap-2">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span className="hidden sm:inline">Verified Profile</span>
+                          <span className="sm:hidden">Verified</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+
+                <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto mt-4 md:mt-0">
                   <button 
                     onClick={() => downloadAsPdf(selected)}
-                    className="px-8 py-4 bg-brand-glass text-white border border-brand-border rounded-sm font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-white/10 transition-all shadow-xl"
+                    className="w-full sm:flex-1 md:w-auto px-6 md:px-8 py-4 bg-brand-glass text-white border border-brand-border rounded-sm font-black uppercase tracking-widest text-[9px] md:text-xs flex items-center justify-center gap-3 hover:bg-white/10 transition-all shadow-xl"
                   >
                     <Download className="w-4 h-4 text-brand-accent" />
-                    Export PDF
+                    Export Dossier
                   </button>
                   <button 
                     onClick={() => performAIScreening(selected)}
                     disabled={screening}
-                    className="px-8 py-4 bg-brand-accent text-black rounded-sm font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-[0_0_20px_var(--color-brand-accent-glow)] disabled:opacity-30"
+                    className="w-full sm:flex-1 md:w-auto relative group px-6 md:px-10 py-4 bg-brand-accent text-black rounded-xl font-black uppercase tracking-[0.2em] text-[9px] md:text-[11px] flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(0,242,255,0.4)] disabled:opacity-30 disabled:hover:scale-100"
                   >
-                    {screening ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                    {screening ? 'Neural Screening...' : 'Execute AI Scan'}
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                    {screening ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+                    {screening ? 'Neural Engine Active...' : 'Execute AI Scan'}
                   </button>
                   <button 
                     onClick={() => setCandidateToDelete(selected)}
-                    className="px-4 py-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-sm hover:bg-red-500/20 transition-all flex items-center justify-center"
+                    className="hidden md:flex px-4 py-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-sm hover:bg-red-500/20 transition-all items-center justify-center"
                     title="Delete Candidate"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1773,7 +1997,7 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
 };
 
 export default function App() {
-  const [view, setView] = useState<ViewState>('landing');
+  const [view, setView] = useState<ViewState>('splash');
   const [isStorageReady, setIsStorageReady] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>(MOCK_CANDIDATES);
 
@@ -1808,11 +2032,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-bg font-sans text-brand-text selection:bg-brand-accent selection:text-black">
+    <div className="min-h-screen bg-brand-bg font-sans text-brand-text selection:bg-brand-accent selection:text-black flex flex-col">
       <Header view={view} setView={setView} />
       
-      <main>
+      <main className="flex-1">
         <AnimatePresence mode="wait">
+          {view === 'splash' && (
+            <motion.div 
+              key="splash"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <SplashScreen onComplete={() => setView('landing')} />
+            </motion.div>
+          )}
+
           {view === 'landing' && (
             <motion.div 
               key="landing"
@@ -1820,7 +2055,7 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <LandingHero onStart={() => setView('apply')} />
+              <LandingHero onStart={() => setView('apply')} onAdmin={() => setView('admin')} />
             </motion.div>
           )}
 
@@ -1859,23 +2094,23 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <footer className="border-t border-brand-border py-16 px-12 mt-auto bg-black/30">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
+      <footer className="border-t border-brand-border py-12 md:py-16 px-6 md:px-12 mt-auto bg-black/30">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10 md:gap-12">
           <div className="flex items-center gap-4">
              <img 
                src="https://i.ibb.co/HL31wDVs/aeroprofessional-limited-logo-removebg-preview.png" 
                alt="AeroProfissional" 
-               className="h-8 w-auto brightness-75"
+               className="h-6 md:h-8 w-auto brightness-75"
                referrerPolicy="no-referrer"
              />
-             <span className="font-black uppercase tracking-widest text-brand-accent">AeroProfissional</span>
+             <span className="font-black uppercase tracking-widest text-brand-accent text-[10px] md:text-xs">AeroProfissional</span>
           </div>
-          <div className="flex gap-12 text-[10px] uppercase font-black tracking-widest text-brand-dim">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-[8px] md:text-[10px] uppercase font-black tracking-widest text-brand-dim">
              <a href="#" className="hover:text-white transition-colors">Privacy Protocol</a>
              <a href="#" className="hover:text-white transition-colors">Candidate Terms</a>
              <span className="text-white/20">System Status: <span className="text-brand-accent">Operational</span></span>
           </div>
-          <div className="text-[10px] text-white/10 font-mono">
+          <div className="text-[8px] md:text-[10px] text-white/10 font-mono text-center">
             &copy; 2026 AEROPROFISSIONAL LTD. ALL RIGHTS RESERVED.
           </div>
         </div>

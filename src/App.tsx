@@ -226,7 +226,7 @@ const LandingHero = ({ onStart }: { onStart: () => void }) => (
   </div>
 );
 
-const VideoRecorder = ({ onComplete }: { onComplete: (blob: Blob) => void }) => {
+const VideoRecorder = ({ onComplete }: { onComplete: (base64: string) => void }) => {
   const [recording, setRecording] = useState(false);
   const [timer, setTimer] = useState(120);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -255,8 +255,15 @@ const VideoRecorder = ({ onComplete }: { onComplete: (blob: Blob) => void }) => 
     };
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      setPreviewUrl(URL.createObjectURL(blob));
-      onComplete(blob);
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const base64 = loadEvent.target?.result as string;
+        onComplete(base64);
+      };
+      reader.readAsDataURL(blob);
     };
     mediaRecorder.start();
     setRecording(true);
@@ -379,7 +386,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
     docUrls: {} as { [name: string]: string },
     photoUrl: ''
   });
-  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [videoBase64, setVideoBase64] = useState<string | null>(null);
 
   const roles = ["Senior Cabin Crew", "Flight Attendant", "First Class Service Specialist", "Language Specialist (Cabin)", "Ground Support"];
   const rotations = ["14 weeks ON/ 2 weeks Off", "21 Weeks ON / 3Weeks Off"];
@@ -407,7 +414,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
       photoUrl: formData.photoUrl,
       appliedAt: new Date().toISOString().split('T')[0],
       status: 'Pending',
-      videoUrl: videoBlob ? URL.createObjectURL(videoBlob) : undefined
+      videoUrl: videoBase64 || undefined
     });
   };
 
@@ -622,12 +629,12 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
             <p className="text-brand-dim">
               Record a 2-minute introduction. Please share your passion for aviation and why you are the ideal candidate for <span className="text-brand-accent font-bold">{formData.role}</span>.
             </p>
-            <VideoRecorder onComplete={(blob) => setVideoBlob(blob)} />
+            <VideoRecorder onComplete={(base64) => setVideoBase64(base64)} />
             <div className="flex gap-4">
               <button onClick={() => setStep(2)} className="flex-1 py-5 border border-brand-border text-brand-dim rounded-lg font-black uppercase tracking-widest hover:text-white transition-colors">Back</button>
               <button 
                 onClick={handleNext}
-                disabled={!videoBlob}
+                disabled={!videoBase64}
                 className="flex-[2] py-5 bg-brand-accent text-black rounded-lg font-black uppercase tracking-widest disabled:opacity-30 transition-all hover:scale-[1.02]"
               >
                 Continue to Evidence
@@ -766,7 +773,7 @@ const ApplicationWizard = ({ onComplete }: { onComplete: (c: Partial<Candidate>)
                     <span key={d} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[8px] text-brand-dim">{d}</span>
                   ))}
                 </div>
-                {videoBlob && (
+                {videoBase64 && (
                   <div className="flex items-center gap-2 mt-4 text-brand-accent">
                     <CheckCircle2 className="w-4 h-4" />
                     <span className="text-[8px] uppercase font-black tracking-widest">Video Stream Ready</span>
@@ -1073,7 +1080,25 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
               className={`p-5 rounded-2xl cursor-pointer border-l-4 transition-all ${selected?.id === candidate.id ? 'bg-brand-accent/10 border-brand-accent shadow-[0_0_20px_rgba(0,242,255,0.1)]' : 'bg-brand-glass border-transparent hover:bg-brand-glass/80'}`}
             >
               <div className="flex justify-between items-start mb-2">
-                <div className="font-bold text-white text-lg">{candidate.name}</div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <img 
+                      src={candidate.photoUrl || `https://picsum.photos/seed/${candidate.id}/100/100`}
+                      className="w-10 h-10 rounded-lg object-cover border border-white/10"
+                      alt="Avatar"
+                      referrerPolicy="no-referrer"
+                    />
+                    {candidate.videoUrl && (
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-brand-accent rounded-full flex items-center justify-center border-2 border-brand-bg">
+                        <Play className="w-2 h-2 text-black fill-black" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-md">{candidate.name}</div>
+                    <div className="text-[9px] text-brand-dim uppercase tracking-wider">{candidate.nearestAirport}</div>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button 
                     onClick={(e) => {
@@ -1620,7 +1645,11 @@ export default function App() {
 
   // Persist candidates to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('aeroprofessional_candidates', JSON.stringify(candidates));
+    try {
+      localStorage.setItem('aeroprofessional_candidates', JSON.stringify(candidates));
+    } catch (e) {
+      console.warn("Storage limit exceeded. Large media files (videos) may not persist after refresh.", e);
+    }
   }, [candidates]);
 
   const handleApply = (newCand: Partial<Candidate>) => {

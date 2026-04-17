@@ -868,24 +868,36 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
     // Page 1: Main Dossier Summary
     if (pdfRef.current) {
       const element = pdfRef.current;
+      // Ensure the element is visible to html2canvas but not to the user
       const originalDisplay = element.style.display;
+      const originalPosition = element.style.position;
+      const originalVisibility = element.style.visibility;
+      
       element.style.display = 'block';
+      element.style.position = 'fixed';
+      element.style.visibility = 'visible';
+      element.style.zIndex = '-9999';
       
       try {
         const canvas = await html2canvas(element, {
           scale: 3,
           useCORS: true,
           backgroundColor: '#ffffff',
+          logging: false,
         });
-        const imgData = canvas.toDataURL('image/png', 1.0);
+        const imgData = canvas.toDataURL('image/png');
         const imgProps = mainJsPDF.getImageProperties(imgData);
-        const pdfPageHeight = (imgProps.height * width) / imgProps.width;
+        const pdfPageWidth = width;
+        const pdfPageHeight = (imgProps.height * pdfPageWidth) / imgProps.width;
         
-        mainJsPDF.addImage(imgData, 'PNG', 0, 0, width, pdfPageHeight);
+        mainJsPDF.addImage(imgData, 'PNG', 0, 0, pdfPageWidth, pdfPageHeight);
       } catch (error) {
         console.error("Summary page capture failed:", error);
       } finally {
         element.style.display = originalDisplay;
+        element.style.position = originalPosition;
+        element.style.visibility = originalVisibility;
+        element.style.zIndex = 'auto';
       }
     }
 
@@ -1030,9 +1042,10 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
   const performAIScreening = async (candidate: Candidate) => {
     setScreening(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-latest",
+        model: "gemini-3-flash-preview",
         contents: `Act as a senior aviation recruiter. Analyze this cabin crew candidate profile (treating the provided experience data as the core CV content) and provide:
         1. A high-level screening summary (max 2 sentences).
         2. A detailed "CV Professional Scan" which identifies key strengths, potential gaps, and suitability for international flight operations (3-4 bullet points).
@@ -1054,29 +1067,29 @@ const AdminDashboard = ({ candidates, setCandidates }: { candidates: Candidate[]
 
       const resText = response.text || '{ "summary": "Analysis complete.", "cvScan": "Competitive aviation profile.", "videoImpression": "Professional and engaging video presence.", "score": 85, "videoScore": 88 }';
       const cleanJson = resText.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(cleanJson);
+      const aiResult = JSON.parse(cleanJson);
 
       setCandidates(prev => prev.map(c => 
         c.id === candidate.id ? { 
           ...c, 
-          aiSummary: result.summary, 
-          cvAnalysis: result.cvScan, 
-          videoAnalysis: result.videoImpression,
-          videoScore: result.videoScore,
-          score: result.score, 
+          aiSummary: aiResult.summary, 
+          cvAnalysis: aiResult.cvScan, 
+          videoAnalysis: aiResult.videoImpression,
+          videoScore: aiResult.videoScore,
+          score: aiResult.score, 
           status: 'Screened' 
         } : c
       ));
       if (selected?.id === candidate.id) {
-        setSelected({ 
-          ...selected, 
-          aiSummary: result.summary, 
-          cvAnalysis: result.cvScan, 
-          videoAnalysis: result.videoImpression,
-          videoScore: result.videoScore,
-          score: result.score, 
+        setSelected(prev => prev ? { 
+          ...prev, 
+          aiSummary: aiResult.summary, 
+          cvAnalysis: aiResult.cvScan, 
+          videoAnalysis: aiResult.videoImpression,
+          videoScore: aiResult.videoScore,
+          score: aiResult.score, 
           status: 'Screened' 
-        });
+        } : null);
       }
     } catch (err) {
       console.error("AI Error:", err);

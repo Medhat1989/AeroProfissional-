@@ -43,7 +43,7 @@ import {
   deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { db } from './lib/firebase';
+import { db, auth } from './lib/firebase';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
 // --- Types ---
@@ -125,6 +125,58 @@ const MOCK_CANDIDATES: Candidate[] = [
     aiSummary: 'Fluent in Mandarin and English. High focus on customer service excellence and safety protocols.'
   }
 ];
+
+// --- Error Handling ---
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error Detail: ', JSON.stringify(errInfo));
+  return errInfo;
+}
 
 // --- Components ---
 
@@ -556,6 +608,7 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
   const handleNext = () => setStep(s => s + 1);
 
   const handleSubmit = () => {
+    console.log("Submitting candidate profile...", formData.name);
     onComplete({
       name: formData.name,
       email: formData.email,
@@ -2157,13 +2210,19 @@ export default function App() {
       })) as Candidate[];
       setCandidates(cands);
     }, (error) => {
-      console.error("Firestore Sync Error:", error);
+      handleFirestoreError(error, OperationType.GET, 'candidates');
     });
     return () => unsubscribe();
   }, []);
 
   const handleApply = async (newCand: Partial<Candidate>) => {
     try {
+      // Check if video is too large for Firestore document (limit 1MB)
+      if (newCand.videoUrl && newCand.videoUrl.length > 1000000) {
+        alert("The recorded video is too large for the system. Please try a shorter introduction or lower resolution.");
+        return;
+      }
+
       const candidateData = {
         ...newCand,
         status: 'Pending',
@@ -2176,8 +2235,8 @@ export default function App() {
       await addDoc(collection(db, 'candidates'), candidateData);
       setView('success');
     } catch (error) {
-      console.error("Submission Error:", error);
-      alert("Application submission failed. Please try again.");
+      const errInfo = handleFirestoreError(error, OperationType.WRITE, 'candidates');
+      alert(`Application submission failed: ${errInfo.error}. Please ensure your introduction video is short and try again.`);
     }
   };
 
@@ -2186,7 +2245,7 @@ export default function App() {
       const candRef = doc(db, 'candidates', id);
       await updateDoc(candRef, updates);
     } catch (error) {
-      console.error("Update Error:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `candidates/${id}`);
     }
   };
 
@@ -2194,7 +2253,7 @@ export default function App() {
     try {
       await deleteDoc(doc(db, 'candidates', id));
     } catch (error) {
-      console.error("Delete Error:", error);
+      handleFirestoreError(error, OperationType.DELETE, `candidates/${id}`);
     }
   };
 

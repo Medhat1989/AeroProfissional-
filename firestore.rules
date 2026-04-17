@@ -29,7 +29,7 @@ service cloud.firestore {
     function isValidCandidate(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
-             data.status in ['Pending', 'Verified', 'Rejected'];
+             data.status in ['Pending', 'Screened', 'Internal Review', 'Accepted', 'Rejected'];
     }
 
     match /candidates/{candidateId} {

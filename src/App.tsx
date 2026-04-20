@@ -43,7 +43,7 @@ import {
   deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from './lib/firebase';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
@@ -602,6 +602,8 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
     photoUrl: ''
   });
   const [videoBase64, setVideoBase64] = useState<string | null>(null);
+  const [videoMethod, setVideoMethod] = useState<'none' | 'record' | 'upload'>('none');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const roles = ["Senior Cabin Crew", "Flight Attendant", "First Class Service Specialist", "Language Specialist (Cabin)", "Ground Support"];
   const rotations = ["14 weeks ON/ 2 weeks Off", "21 Weeks ON / 3Weeks Off"];
@@ -850,12 +852,104 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
             exit={{ opacity: 0, x: -20 }}
             className="space-y-8"
           >
-            <p className="text-brand-dim">
-              Record a 2-minute introduction. Please share your passion for aviation and why you are the ideal candidate for <span className="text-brand-accent font-bold">{formData.role}</span>.
-            </p>
-            <VideoRecorder onComplete={(base64) => setVideoBase64(base64)} />
+            <div className="space-y-2">
+              <p className="text-brand-dim text-sm">
+                Complete your profile with a <span className="text-brand-accent font-bold">2-minute introduction</span>. Share your passion for aviation and why you are the ideal candidate for <span className="text-brand-accent font-bold">{formData.role}</span>.
+              </p>
+            </div>
+
+            {videoMethod === 'none' && !videoBase64 && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <motion.div 
+                  whileHover={{ y: -5 }}
+                  onClick={() => setVideoMethod('record')}
+                  className="bg-brand-card border border-brand-border p-8 rounded-[2rem] text-center cursor-pointer group hover:border-brand-accent transition-all"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-brand-accent/10 flex items-center justify-center mx-auto mb-6 group-hover:bg-brand-accent transition-colors">
+                    <Video className="w-8 h-8 text-brand-accent group-hover:text-black transition-colors" />
+                  </div>
+                  <h4 className="text-xl font-bold text-white mb-2">Record Live</h4>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-brand-dim mb-6">Capture introduction via camera</p>
+                  <div className="text-[10px] font-black uppercase text-brand-accent opacity-0 group-hover:opacity-100 transition-opacity">Launch Recorder</div>
+                </motion.div>
+
+                <motion.div 
+                  whileHover={{ y: -5 }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-brand-card border border-brand-border p-8 rounded-[2rem] text-center cursor-pointer group hover:border-brand-accent transition-all"
+                >
+                   <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    accept="video/*"
+                    className="hidden" 
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        const file = e.target.files[0];
+                        // Optional size check for local warning before trying to upload
+                        if (file.size > 100 * 1024 * 1024) { // 100MB soft limit for browser stability
+                          alert("Video file exceeds 100MB. Please choose a smaller file for better performance.");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = (loadEvent) => {
+                          const base64 = loadEvent.target?.result as string;
+                          setVideoBase64(base64);
+                          setVideoMethod('upload');
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-6 group-hover:bg-white transition-colors">
+                    <Upload className="w-8 h-8 text-brand-dim group-hover:text-black transition-colors" />
+                  </div>
+                  <h4 className="text-xl font-bold text-white mb-2">Upload Video</h4>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-brand-dim mb-6">Select asset from device storage</p>
+                  <div className="text-[10px] font-black uppercase text-white opacity-0 group-hover:opacity-100 transition-opacity">Browse Files</div>
+                </motion.div>
+              </div>
+            )}
+
+            {(videoMethod === 'record' || (videoMethod === 'none' && !videoBase64)) && videoMethod !== 'upload' && (
+              <div className={videoMethod === 'none' ? 'hidden' : ''}>
+                <VideoRecorder onComplete={(base64) => setVideoBase64(base64)} />
+              </div>
+            )}
+
+            {videoBase64 && (videoMethod === 'upload' || (videoMethod === 'record' && videoBase64)) && (
+              <div className="space-y-6">
+                <div className="relative group rounded-[2.5rem] overflow-hidden border border-brand-border bg-black aspect-video">
+                  <video src={videoBase64} controls className="w-full h-full object-cover" />
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setVideoBase64(null);
+                        setVideoMethod('none');
+                      }}
+                      className="bg-red-500/80 backdrop-blur-md text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" /> Reset Video
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-4">
-              <button onClick={() => setStep(2)} className="flex-1 py-5 border border-brand-border text-brand-dim rounded-lg font-black uppercase tracking-widest hover:text-white transition-colors">Back</button>
+              <button 
+                onClick={() => {
+                  if (videoMethod !== 'none') {
+                    setVideoMethod('none');
+                    setVideoBase64(null);
+                  } else {
+                    setStep(2);
+                  }
+                }} 
+                className="flex-1 py-5 border border-brand-border text-brand-dim rounded-lg font-black uppercase tracking-widest hover:text-white transition-colors"
+              >
+                {videoMethod !== 'none' ? 'Choose Different Method' : 'Back'}
+              </button>
               <button 
                 onClick={handleNext}
                 disabled={!videoBase64}
@@ -1090,7 +1184,7 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
                 onClick={handleSubmit}
                 className="flex-[2] py-5 bg-brand-accent text-black rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-[0_0_50px_var(--color-brand-accent-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Confirm & Submit Profile
+                Confirm & Sync Profile (v1.0.9)
               </button>
             </div>
           </motion.div>
@@ -2198,9 +2292,14 @@ const AdminDashboard = ({
 };
 
 export default function App() {
+  const [version] = useState('1.0.8-sync-fixed');
   const [view, setView] = useState<ViewState>('splash');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    console.log(`AeroProfissional Engine Initialized: v${version}`);
+  }, []);
 
   // Real-time Firestore Sync
   useEffect(() => {
@@ -2218,32 +2317,42 @@ export default function App() {
   }, []);
 
   const handleApply = async (newCand: Partial<Candidate>) => {
+    console.log("handleApply transition initialized: [TARGET]", newCand.name);
     try {
       setIsUploading(true);
       let finalVideoUrl = newCand.videoUrl;
 
-      // If we have a video (base64 from recorder), upload to Firebase Storage
+      // If we have a base64 video, convert to blob and upload to Storage
       if (newCand.videoUrl && newCand.videoUrl.startsWith('data:video')) {
-        const storageRef = ref(storage, `videos/${Date.now()}_video.webm`);
-        const snapshot = await uploadString(storageRef, newCand.videoUrl, 'data_url');
+        console.log("Stage 1: Binary conversion from base64 data stream...");
+        const response = await fetch(newCand.videoUrl);
+        const blob = await response.blob();
+        
+        console.log(`Stage 2: Cloud sync initiated. Payload size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
+        const storageRef = ref(storage, `videos/${Date.now()}_${Math.random().toString(36).substring(7)}.webm`);
+        const snapshot = await uploadBytes(storageRef, blob);
         finalVideoUrl = await getDownloadURL(snapshot.ref);
+        console.log("Stage 3: Synchronization complete. Asset URL persistent.");
       }
 
       const candidateData = {
         ...newCand,
         videoUrl: finalVideoUrl,
         status: 'Pending',
-        appliedAt: new Intl.DateTimeFormat('en-CA').format(new Date()), // YYYY-MM-DD
+        appliedAt: new Intl.DateTimeFormat('en-CA').format(new Date()),
         createdAt: serverTimestamp(),
         docs: newCand.docs || [],
         hrComments: []
       };
       
-      await addDoc(collection(db, 'candidates'), candidateData);
+      console.log("Stage 4: Firestore record persistence...");
+      const docRef = await addDoc(collection(db, 'candidates'), candidateData);
+      console.log("Persistence success. Record identified as:", docRef.id);
       setView('success');
     } catch (error) {
+      console.error("Critical System Interruption:", error);
       const errInfo = handleFirestoreError(error, OperationType.WRITE, 'candidates');
-      alert(`Application submission failed: ${errInfo.error}. Please try again.`);
+      alert(`System Transmission Protocol Failed: ${errInfo.error}. Please ensure high-bandwidth connectivity and retry.`);
     } finally {
       setIsUploading(false);
     }

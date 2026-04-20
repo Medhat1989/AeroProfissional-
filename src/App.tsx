@@ -919,8 +919,8 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
 
             {videoBase64 && (videoMethod === 'upload' || (videoMethod === 'record' && videoBase64)) && (
               <div className="space-y-6">
-                <div className="relative group rounded-[2.5rem] overflow-hidden border border-brand-border bg-black aspect-video">
-                  <video src={videoBase64} controls className="w-full h-full object-cover" />
+                <div className="relative group rounded-[2.5rem] overflow-hidden border border-brand-border bg-black">
+                  <video src={videoBase64} controls className="w-full h-auto max-h-[70vh] object-contain" />
                   <div className="absolute top-4 right-4 flex gap-2">
                     <button 
                       onClick={() => {
@@ -1139,11 +1139,11 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
                   </div>
                   
                   {videoBase64 ? (
-                    <div className="rounded-2xl overflow-hidden border border-brand-border bg-black aspect-video">
+                    <div className="rounded-2xl overflow-hidden border border-brand-border bg-black">
                       <video 
                         src={videoBase64} 
                         controls 
-                        className="w-full h-full object-cover"
+                        className="w-full h-auto max-h-[500px] object-contain"
                       />
                     </div>
                   ) : (
@@ -1792,21 +1792,23 @@ const AdminDashboard = ({
                     </div>
                     <div 
                       onClick={() => setPlayingVideo(selected.videoUrl || `https://www.w3schools.com/html/mov_bbb.mp4`)} // Default mock video
-                      className="aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative group border border-brand-border cursor-pointer hover:border-brand-accent transition-all"
+                      className="bg-black rounded-2xl overflow-hidden shadow-2xl relative group border border-brand-border cursor-pointer hover:border-brand-accent transition-all min-h-[200px] flex items-center justify-center"
                     >
                       {selected.videoUrl ? (
                         <video 
                           src={selected.videoUrl} 
-                          className="w-full h-full object-cover opacity-50 transition-all duration-700 group-hover:opacity-80"
+                          className="w-full h-auto max-h-[500px] object-contain opacity-50 transition-all duration-700 group-hover:opacity-80"
                           muted
                         />
                       ) : (
-                        <img 
-                          src={`https://picsum.photos/seed/video${selected.id}/800/450`} 
-                          className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" 
-                          alt="Thumbnail"
-                          referrerPolicy="no-referrer"
-                        />
+                        <div className="aspect-video w-full">
+                          <img 
+                            src={`https://picsum.photos/seed/video${selected.id}/800/450`} 
+                            className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" 
+                            alt="Thumbnail"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
                       )}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-20 h-20 rounded-full bg-brand-accent border-[6px] border-black flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_30px_rgba(0,242,255,0.4)]">
@@ -1991,7 +1993,7 @@ const AdminDashboard = ({
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)] border border-brand-border"
+              className="relative w-full max-w-5xl bg-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)] border border-brand-border"
             >
               <button 
                 onClick={() => setPlayingVideo(null)}
@@ -2002,7 +2004,7 @@ const AdminDashboard = ({
               
               <video 
                 src={playingVideo} 
-                className="w-full h-full object-contain"
+                className="w-full h-auto max-h-[85vh] object-contain"
                 autoPlay 
                 controls
               />

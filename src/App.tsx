@@ -509,18 +509,18 @@ const VideoRecorder = ({ onComplete }: { onComplete: (base64: string) => void })
   }, []);
 
   return (
-    <div className="bg-brand-card rounded-3xl overflow-hidden relative border border-brand-border group">
+    <div className="bg-brand-card rounded-3xl overflow-hidden relative border border-brand-border group aspect-[2/3] max-w-[400px] mx-auto">
       <video 
         ref={videoRef} 
         autoPlay 
         muted 
-        className={`w-full aspect-video object-cover pointer-events-none transition-opacity duration-1000 ${previewUrl ? 'opacity-0 absolute' : 'opacity-60'}`} 
+        className={`w-full h-full object-cover pointer-events-none transition-opacity duration-1000 ${previewUrl ? 'opacity-0 absolute' : 'opacity-60'}`} 
       />
       {previewUrl && (
         <video 
           src={previewUrl} 
           controls 
-          className="w-full aspect-video object-cover" 
+          className="w-full h-full object-cover" 
         />
       )}
 
@@ -919,8 +919,8 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
 
             {videoBase64 && (videoMethod === 'upload' || (videoMethod === 'record' && videoBase64)) && (
               <div className="space-y-6">
-                <div className="relative group rounded-[2.5rem] overflow-hidden border border-brand-border bg-black">
-                  <video src={videoBase64} controls className="w-full h-auto max-h-[70vh] object-contain" />
+                <div className="relative group rounded-[2.5rem] overflow-hidden border border-brand-border bg-black aspect-[2/3] max-w-[320px] mx-auto shadow-2xl">
+                  <video src={videoBase64} controls className="w-full h-full object-cover" />
                   <div className="absolute top-4 right-4 flex gap-2">
                     <button 
                       onClick={() => {
@@ -1139,11 +1139,11 @@ const ApplicationWizard = ({ onComplete, onBack }: { onComplete: (c: Partial<Can
                   </div>
                   
                   {videoBase64 ? (
-                    <div className="rounded-2xl overflow-hidden border border-brand-border bg-black">
+                    <div className="rounded-2xl overflow-hidden border border-brand-border bg-black aspect-[2/3] max-w-[280px] mx-auto shadow-xl">
                       <video 
                         src={videoBase64} 
                         controls 
-                        className="w-full h-auto max-h-[500px] object-contain"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                   ) : (
@@ -1792,18 +1792,18 @@ const AdminDashboard = ({
                     </div>
                     <div 
                       onClick={() => setPlayingVideo(selected.videoUrl || `https://www.w3schools.com/html/mov_bbb.mp4`)} // Default mock video
-                      className="bg-black rounded-2xl overflow-hidden shadow-2xl relative group border border-brand-border cursor-pointer hover:border-brand-accent transition-all min-h-[200px] flex items-center justify-center"
+                      className="bg-black rounded-2xl overflow-hidden shadow-2xl relative group border border-brand-border cursor-pointer hover:border-brand-accent transition-all aspect-[2/3] max-w-[320px] mx-auto"
                     >
                       {selected.videoUrl ? (
                         <video 
                           src={selected.videoUrl} 
-                          className="w-full h-auto max-h-[500px] object-contain opacity-50 transition-all duration-700 group-hover:opacity-80"
+                          className="w-full h-full object-cover opacity-50 transition-all duration-700 group-hover:opacity-80"
                           muted
                         />
                       ) : (
-                        <div className="aspect-video w-full">
+                        <div className="aspect-[2/3] w-full">
                           <img 
-                            src={`https://picsum.photos/seed/video${selected.id}/800/450`} 
+                            src={`https://picsum.photos/seed/video${selected.id}/400/600`} 
                             className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-700" 
                             alt="Thumbnail"
                             referrerPolicy="no-referrer"
@@ -1993,7 +1993,7 @@ const AdminDashboard = ({
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-5xl bg-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)] border border-brand-border"
+              className="relative w-full max-w-sm aspect-[2/3] bg-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,1)] border border-brand-border"
             >
               <button 
                 onClick={() => setPlayingVideo(null)}
@@ -2004,7 +2004,7 @@ const AdminDashboard = ({
               
               <video 
                 src={playingVideo} 
-                className="w-full h-auto max-h-[85vh] object-contain"
+                className="w-full h-full object-cover"
                 autoPlay 
                 controls
               />

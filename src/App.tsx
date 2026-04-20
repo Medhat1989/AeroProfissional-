@@ -43,7 +43,7 @@ import {
   deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from './lib/firebase';
 import { saveCandidates, loadCandidates } from './lib/storage';
 
@@ -2298,6 +2298,7 @@ export default function App() {
   const [view, setView] = useState<ViewState>('splash');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     console.log(`AeroProfissional Engine Initialized: v${version}`);
@@ -2322,6 +2323,7 @@ export default function App() {
     console.log("handleApply transition initialized: [TARGET]", newCand.name);
     try {
       setIsUploading(true);
+      setUploadProgress(0);
       let finalVideoUrl = newCand.videoUrl;
 
       // If we have a base64 video, convert to blob and upload to Storage
@@ -2332,9 +2334,33 @@ export default function App() {
         
         console.log(`Stage 2: Cloud sync initiated. Payload size: ${(blob.size / (1024 * 1024)).toFixed(2)} MB`);
         const storageRef = ref(storage, `videos/${Date.now()}_${Math.random().toString(36).substring(7)}.webm`);
-        const snapshot = await uploadBytes(storageRef, blob);
-        finalVideoUrl = await getDownloadURL(snapshot.ref);
+        
+        // Use resumable upload to track progress
+        const uploadTask = uploadBytesResumable(storageRef, blob);
+        
+        await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              console.log('Upload is ' + progress + '% done');
+              setUploadProgress(Math.round(progress));
+            }, 
+            (error) => {
+              console.error("Upload task failed:", error);
+              reject(error);
+            }, 
+            () => {
+              console.log("Upload completed successfully.");
+              resolve(true);
+            }
+          );
+        });
+
+        finalVideoUrl = await getDownloadURL(uploadTask.snapshot.ref);
         console.log("Stage 3: Synchronization complete. Asset URL persistent.");
+      } else {
+        // If no video upload, set progress to 100 to show consistency in UI
+        setUploadProgress(100);
       }
 
       const candidateData = {
@@ -2357,6 +2383,7 @@ export default function App() {
       alert(`System Transmission Protocol Failed: ${errInfo.error}. Please ensure high-bandwidth connectivity and retry.`);
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -2381,14 +2408,31 @@ export default function App() {
     <div className="min-h-screen bg-brand-bg font-sans text-brand-text selection:bg-brand-accent selection:text-black flex flex-col">
       {/* Global Loading Overlay */}
       {isUploading && (
-        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center">
-          <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-16 h-16 border-4 border-brand-accent border-t-transparent rounded-full mb-8 shadow-[0_0_30px_rgba(0,242,255,0.4)]"
-          />
-          <h2 className="text-xl font-black uppercase tracking-[0.3em] text-white mb-2">Syncing Assets</h2>
-          <p className="text-[10px] uppercase font-black tracking-widest text-brand-dim">Transmitting introduction data to AeroProfissional Index</p>
+        <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-8">
+          <div className="relative mb-12">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              className="w-32 h-32 border-2 border-brand-accent/20 border-t-brand-accent rounded-full shadow-[0_0_50px_rgba(0,242,255,0.2)]"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl font-black text-brand-accent tabular-nums">{uploadProgress}%</span>
+            </div>
+          </div>
+          
+          <div className="max-w-md w-full space-y-4 text-center">
+            <h2 className="text-2xl font-black uppercase tracking-[0.4em] text-white">Syncing Assets</h2>
+            <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+               <motion.div 
+                 initial={{ width: 0 }}
+                 animate={{ width: `${uploadProgress}%` }}
+                 className="h-full bg-brand-accent shadow-[0_0_20px_var(--color-brand-accent-glow)]"
+               />
+            </div>
+            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-brand-dim animate-pulse">
+              {uploadProgress < 100 ? 'Transmitting introduction data to AeroProfissional Index' : 'Finalizing secure candidate handshake'}
+            </p>
+          </div>
         </div>
       )}
 
